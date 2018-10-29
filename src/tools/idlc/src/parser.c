@@ -42,10 +42,36 @@ idl_parse_file(const char *file)
 
     idl_parser_lex_init(&scanner);
     idl_parser_set_in(fh, scanner);
-    idl_parser_parse(scanner, NULL);
+    err = idl_parser_parse(scanner, 0);
     idl_parser_lex_destroy(scanner);
     (void)fclose(fh);
   }
 
   return err;
 }
+
+int
+idl_parse_string(const char *str, int ignore_yyerror)
+{
+  int err = 0;
+
+  assert(str != NULL);
+  if (str == NULL) {
+    fprintf(stderr, "String argument is NULL\n");
+    err = -1;
+  } else {
+    YYSTYPE yystype;
+    YYLTYPE yyltype;
+    yyscan_t scanner;
+
+    idl_parser_lex_init(&scanner);
+    idl_parser__scan_string(str, scanner);
+    idl_context_t context;
+    context.ignore_yyerror = ignore_yyerror;
+    err = idl_parser_parse(scanner, &context);
+    idl_parser_lex_destroy(scanner);
+  }
+
+  return err;
+}
+  

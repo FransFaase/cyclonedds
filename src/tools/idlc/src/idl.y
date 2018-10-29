@@ -45,6 +45,7 @@ idl_parser_token_matches_keyword(const char *token);
 
 struct idl_context {
   /* FIXME: implement */
+  int ignore_yyerror;
 };
 
 typedef struct idl_context idl_context_t;
@@ -684,9 +685,10 @@ identifier:
         size_t offset = 0;
         if ($1[0] == '_') {
           offset = 1;
-        } else if (idl_parser_token_matches_keyword($1) == 0) {
+        } else if (idl_parser_token_matches_keyword($1) != 0) {
           /* FIXME: come up with a better error message */
           yyerror(&yylloc, scanner, context, "Identifier matches a keyword");
+          fprintf(stderr, "'%s'\n", $1);
           YYABORT;
         } else if (($$ = strdup($1 + offset)) == NULL) {
           /* FIXME: come up with a better error message */
@@ -711,6 +713,10 @@ yyerror(
   YYLTYPE *yylloc, yyscan_t yyscanner, idl_context_t *context, char *text)
 {
   /* FIXME: implement */
+  if (context != 0 && context->ignore_yyerror != 0) {
+    return 0;
+  }
+
   fprintf(stderr, "ERROR: %s\n", text);
   return 0;
 }
