@@ -28,6 +28,8 @@ typedef void *yyscan_t;
 #include "idl.parser.h"
 #include "yy_decl.h" /* prevent implicit declaration of yylex */
 
+#define YYFPRINTF (unsigned int)fprintf
+
 int
 yyerror(
   YYLTYPE *yylloc, yyscan_t yyscanner, idl_context_t *context, char *text);
@@ -43,21 +45,18 @@ idl_parser_token_matches_keyword(const char *token);
 /* FIXME: */
 #include "type.h"
 
-struct idl_context {
-  /* FIXME: implement */
-  int ignore_yyerror;
-};
-
-typedef struct idl_context idl_context_t;
 }
 
 
 %union {
   bool boolean;
-  idl_basic_type_t type;
+  idl_basic_type_t basic_type;
+  idl_type_t *type;
+  idl_bit_value_list_t *bit_value_list;
   idl_literal_t literal;
   idl_identifier_t identifier;
-  //idl_scoped_name_t* scoped_name;
+  idl_operator_type_t operator_type;
+  idl_scoped_name_t* scoped_name;
 }
 
 %define api.pure full
@@ -87,9 +86,12 @@ typedef struct idl_context idl_context_t;
   FLOATING_PT_LITERAL
   FIXED_PT_LITERAL
 
-%type <type>
+%type <basic_type>
   simple_type_spec
+  switch_type_spec
   base_type_spec
+  destination_type
+  annotation_member_type
   const_type
   floating_pt_type
   fixed_pt_const_type
@@ -108,17 +110,46 @@ typedef struct idl_context idl_context_t;
   wide_char_type
   boolean_type
   octet_type
-/*any_type*/
+  any_const_type
+
+%type <type>
+  type_spec
+  template_type_spec
+  sequence_type
+  string_type
+  fixed_pt_type
+  map_type
+  scoped_name_opt
+
+%type <scoped_name>
+  scoped_name
+
+%type <bit_value_list>
+  bit_value_list
 
 %type <literal>
+  positive_int_const
   literal
   const_expr
+  or_expr
+  xor_expr
+  and_expr
+  shift_expr
+  add_expr
+  mult_expr
+  unary_expr
   primary_expr
 
-%type <identifier> identifier
+%type <operator_type> unary_operator
+
+%type <identifier>
+  simple_declarator
+  bit_value
+  identifier
 
 /* operators */
-%token LSHIFT RSHIFT
+%token LSHIFT "<<"
+%token RSHIFT ">>"
 
 /* keywords */
 %token MODULE "module"
@@ -185,21 +216,24 @@ definition:
   ;
 
 module_dcl:
-    annotation_appls MODULE identifier '{' definitions '}'
-       { };
+    annotation_appls MODULE identifier { idl_add_module_open(context, $3); }
+    '{' definitions '}'
+       { idl_module_close(context); };
 
 scoped_name:
      identifier
-       { /*$$ = idl_new_scoped_name(0, false, $1);*/ }
+       { $$ = idl_new_scoped_name(context, 0, false, $1); }
    | "::" identifier
-       { /*$$ = idl_new_scoped_name(0, true, $2);*/ }
+       { $$ = idl_new_scoped_name(context, 0, true, $2); }
    | scoped_name "::" identifier
-       { /*$$ = idl_new_scoped_name($1, false, $3);*/ } 
+       { $$ = idl_new_scoped_name(context, $1, false, $3); } 
    ;
 
 const_dcl:
     annotation_appls CONST const_type identifier '=' const_expr
-      { /* FIXME: printf("const_type is of: %d\n", ($2)->basic_type); */ }
+      { /* FIXME: printf("const_type is of: %d\n", ($2)->basic_type); */
+        idl_print_literal(stderr, $6); fprintf(stderr, "\n");
+      }
   ;
 
 const_type:
@@ -216,55 +250,54 @@ const_type:
   ;
 
 const_expr:
-    or_expr
-      { };
+    or_expr ;
 
 or_expr:
     xor_expr
   | or_expr '|' xor_expr
-      { };
+      { idl_eval_binary_oper(idl_operator_or, $1, $3, &($$)); };
 
 xor_expr:
     and_expr
   | xor_expr '^' and_expr
-      { };
+      { idl_eval_binary_oper(idl_operator_xor, $1, $3, &($$)); };
 
 and_expr:
     shift_expr
   | and_expr '&' shift_expr
-      { };
+      { idl_eval_binary_oper(idl_operator_and, $1, $3, &($$)); };
 
 shift_expr:
     add_expr
   | shift_expr "<<" add_expr
-      { }
+      { idl_eval_binary_oper(idl_operator_shift_left, $1, $3, &($$)); }
   | shift_expr ">>" add_expr
-      { };
+      { idl_eval_binary_oper(idl_operator_shift_right, $1, $3, &($$)); };
 
 add_expr:
     mult_expr
   | add_expr '+' mult_expr
-      { }
+      { idl_eval_binary_oper(idl_operator_add, $1, $3, &($$)); }
   | add_expr '-' mult_expr
-      { };
+      { idl_eval_binary_oper(idl_operator_sub, $1, $3, &($$)); };
 
 mult_expr:
     unary_expr
   | mult_expr '*' unary_expr
-      { }
+      { idl_eval_binary_oper(idl_operator_times, $1, $3, &($$)); }
   | mult_expr '/' unary_expr
-      { }
+      { idl_eval_binary_oper(idl_operator_div, $1, $3, &($$)); }
   | mult_expr '%' unary_expr
-      { };
+      { idl_eval_binary_oper(idl_operator_mod, $1, $3, &($$)); };
 
 unary_expr:
-    unary_operator primary_expr
+    unary_operator primary_expr { idl_eval_unary_oper($1, $2, &($$)); }
   | primary_expr;
 
 unary_operator:
-    '-' { }
-  | '+' { }
-  | '~' { };
+    '-' { $$ = idl_operator_minus; }
+  | '+' { $$ = idl_operator_plus; }
+  | '~' { $$ = idl_operator_inv; };
 
 primary_expr:
 /* FIXME:    scoped_name
@@ -304,11 +337,11 @@ type_dcl:
   ;
 
 type_spec:
-    simple_type_spec ;
+    simple_type_spec { $$ = idl_new_basic_type(context, $1); };
 
 simple_type_spec:
-    base_type_spec
-  | scoped_name { /*$$ = new_idl_type_from_scoped_name($1);*/ }
+    base_type_spec 
+  | scoped_name { /*$$ = idl_get_type_from_scoped_name($1);*/ }
   ;
 
 base_type_spec:
@@ -322,9 +355,9 @@ base_type_spec:
 
 /* Basic Types */
 floating_pt_type:
-    FLOAT { /*$$ = new_idl_type_from_basic_type(idl_float);*/ }
-  | DOUBLE { /*$$ = new_idl_type_from_basic_type(idl_double);*/ }
-  | LONG DOUBLE { /*$$ = new_idl_type_from_basic_type(idl_longdouble);*/ };
+    FLOAT { $$ = idl_float; }
+  | DOUBLE { $$ = idl_double; }
+  | LONG DOUBLE { $$ = idl_longdouble; };
 
 integer_type:
     signed_int
@@ -332,31 +365,28 @@ integer_type:
   ;
 
 signed_int:
-    SHORT { /*$$ = new_idl_type_from_basic_type(idl_short);*/ }
-  | LONG { /*$$ = new_idl_type_from_basic_type(idl_long);*/ }
-  | LONG LONG { /*$$ = new_idl_type_from_basic_type(idl_longlong);*/ }
+    SHORT { $$ = idl_short; }
+  | LONG { $$ = idl_long; }
+  | LONG LONG { $$ = idl_longlong; }
   ;
 
 unsigned_int:
-    UNSIGNED SHORT { /*$$ = new_idl_type_from_basic_type(idl_ushort);*/ }
-  | UNSIGNED LONG { /*$$ = new_idl_type_from_basic_type(idl_ulong);*/ }
-  | UNSIGNED LONG LONG { /*$$ = new_idl_type_from_basic_type(idl_ulonglong);*/ }
+    UNSIGNED SHORT { $$ = idl_ushort; }
+  | UNSIGNED LONG { $$ = idl_ulong; }
+  | UNSIGNED LONG LONG { $$ = idl_ulonglong; }
   ;
 
 char_type:
-    CHAR { /*$$ = new_idl_type_from_basic_type(idl_char);*/ };
+    CHAR { $$ = idl_char; };
 
 wide_char_type:
-    WCHAR { /*$$ = new_idl_type_from_basic_type(idl_wchar);*/ };
+    WCHAR { $$ = idl_wchar; };
 
 boolean_type:
-    BOOLEAN { /*$$ = new_idl_type_from_basic_type(idl_boolean);*/ };
+    BOOLEAN { $$ = idl_boolean; };
 
 octet_type:
-    OCTET { /*$$ = new_idl_type_from_basic_type(idl_octet);*/ };
-
-/*any_type:
-    ANY { $$ = idl_any; };*/
+    OCTET { $$ = idl_octet; };
 
 template_type_spec:
     sequence_type
@@ -367,12 +397,16 @@ template_type_spec:
 
 sequence_type:
     SEQUENCE '<' type_spec ',' positive_int_const '>'
+      { $$ = idl_new_sequence_type(context, $3, $5); }
   | SEQUENCE '<' type_spec '>'
+      { $$ = idl_new_sequence_type_unbound(context, $3); }
   ;
 
 string_type:
     STRING '<' positive_int_const '>'
-  | STRING 
+      { $$ = idl_new_string_type(context, $3); }
+  | STRING
+      { $$ = idl_new_string_type_unbound(context); }
   ;
 
 /* FIXME:
@@ -384,6 +418,7 @@ wide_string_type:
 
 fixed_pt_type:
     FIXED '<' positive_int_const ',' positive_int_const '>'
+      { $$ = idl_new_fixed_type(context, $3, $5); }
   ;
 
 fixed_pt_const_type: FIXED { /*$$ = idl_fixed;*/ };
@@ -400,7 +435,10 @@ struct_dcl:
   ;
 
 struct_def:
-    annotation_appls STRUCT identifier '{' members '}'
+    annotation_appls STRUCT identifier '{'
+      { idl_add_struct_open(context, $3); }
+    members '}' 
+      { idl_struct_close(context); }
   ;
 members:
     member members
@@ -408,11 +446,13 @@ members:
   ;
 
 member:
-    annotation_appls type_spec declarators ';'
+    annotation_appls type_spec { idl_add_struct_member(context, $2); } 
+    declarators ';'
   ;
 
 struct_forward_dcl: 
-    annotation_appls STRUCT identifier ;
+    annotation_appls STRUCT identifier 
+      { idl_add_struct_forward(context, $3); };
 
 union_dcl:
     union_def
@@ -421,13 +461,15 @@ union_dcl:
 
 union_def:
     annotation_appls UNION identifier SWITCH '(' switch_type_spec ')'
+       { idl_add_union_open(context, $3, $6); }
     '{' switch_body '}'
+       { idl_union_close(context); }
   ;
 switch_type_spec:
     integer_type
   | char_type
   | boolean_type
-  | scoped_name
+  | scoped_name { $$ = idl_get_basic_type_of_scoped_name(context, $1); }
   ;
 
 switch_body: cases ;
@@ -446,21 +488,23 @@ case_labels:
   ;
 
 case_label:
-    CASE const_expr ':'
-  | DEFAULT ':'
+    CASE const_expr ':' { idl_add_union_case_label(context, $2); }
+  | DEFAULT ':' { idl_add_union_case_default(context); }
   ;
 
 element_spec:
-    type_spec declarator 
+    type_spec { idl_add_union_element(context, $1); }
+    declarator 
   ;
 
 union_forward_dcl:
-    annotation_appls UNION identifier
+    annotation_appls UNION identifier { idl_add_union_forward(context, $3); }
   ;
 
+
 enum_dcl:
-    annotation_appls ENUM identifier
-    '{' enumerator_list '}'
+    annotation_appls ENUM identifier { idl_add_enum_open(context, $3); }
+    '{' enumerator_list '}' { idl_enum_close(context); }
   ;
 
 enumerator_list:
@@ -468,10 +512,11 @@ enumerator_list:
   | enumerator
   ;
 
-enumerator: identifier ;
+enumerator: identifier { idl_add_enum_enumerator(context, $1); };
 
 array_declarator:
-    identifier fixed_array_sizes
+    identifier 
+    fixed_array_sizes { idl_add_declarator(context, $1); }
   ;
 
 fixed_array_sizes:
@@ -480,23 +525,32 @@ fixed_array_sizes:
   ;
 
 fixed_array_size:
-    '[' positive_int_const ']'
+    '[' positive_int_const ']' { idl_add_array_size(context, $2); }
   ;
 
 native_dcl:
     annotation_appls NATIVE simple_declarator
+      { idl_add_native(context, $3); }
   ;
 
 simple_declarator: identifier ;
 
 typedef_dcl:
-    annotation_appls TYPEDEF type_declarator
+    annotation_appls TYPEDEF { idl_add_typedef_open(context); }
+    type_declarator
   ;
 
 type_declarator:
-    simple_type_spec any_declarators
-  | template_type_spec any_declarators
+    simple_type_spec
+      { idl_typedef_set_type(context, idl_new_basic_type(context, $1)); }
+    any_declarators
+      { idl_typedef_close(context); }
+  | template_type_spec
+      { idl_typedef_set_type(context, $1); }
+    any_declarators
+      { idl_typedef_close(context); }
   | constr_type_dcl any_declarators
+      { idl_typedef_close(context); }
   ;
 
 any_declarators:
@@ -515,12 +569,19 @@ declarators:
   ;
 
 declarator: simple_declarator
+      { idl_add_declarator(context, $1); };
 
 
 // From Building Block Extended Data-Types:
 struct_def:
-    annotation_appls STRUCT identifier ':' scoped_name '{' members '}'
-  | annotation_appls STRUCT identifier '{' '}'
+    annotation_appls STRUCT identifier ':' scoped_name '{' 
+      { idl_add_struct_extension_open(context, $3, $5); }
+    members '}'
+      { idl_struct_close(context); }
+  | annotation_appls STRUCT identifier '{'
+      { idl_add_struct_open(context, $3); }
+    '}'
+      { idl_struct_empty_close(context); }
   ;
 
 switch_type_spec: 
@@ -539,16 +600,21 @@ constr_type_dcl:
 
 map_type:
     annotation_appls MAP '<' type_spec ',' type_spec ',' positive_int_const '>'
+      { $$ = idl_new_map_type(context, $4, $6, $8); }
   | annotation_appls MAP '<' type_spec ',' type_spec '>'
+      { $$ = idl_new_map_type_unbound(context, $4, $6); }
   ;
 
 bitset_dcl:
-    BITSET identifier scoped_name_opt '{' bitfields '}'
+    BITSET identifier scoped_name_opt 
+      { idl_add_bitset_open(context, $2, $3); }
+    '{' bitfields '}'
+      { idl_bitset_close(context); }
   ;
 
 scoped_name_opt:
-    ':' scoped_name_opt
-  |
+    ':' scoped_name_opt { $$ = $2; }
+  | { $$ = (idl_type_t*)0; }
   ;
 
 bitfields:
@@ -561,13 +627,15 @@ bitfield:
   ;
 
 identifiers:
-    identifier identifiers
-  | identifier
+    identifier identifiers { idl_add_bitset_ident(context, $1); } 
+  | identifier { idl_add_bitset_ident(context, $1); }
   ;
 
 bitfield_spec:
     BITFIELD '<' positive_int_const '>'
+      { idl_add_bitset_field(context, $3); }
   | BITFIELD '<' positive_int_const ',' destination_type '>'
+      { idl_add_bitset_field_to(context, $3, $5); }
   ;
 
 destination_type:
@@ -578,11 +646,12 @@ destination_type:
 
 bitmask_dcl:
     BITMASK identifier '{' bit_value_list '}'
+      { idl_add_bitmask(context, $2, $4); }
   ;
 
 bit_value_list:
-    bit_value ',' bit_value_list
-  | bit_value
+    bit_value ',' bit_value_list { $$ = idl_new_bit_value_list(context, $1, $3); }
+  | bit_value { $$ = idl_new_bit_value_list(context, $1, 0); }
   ;
 
 bit_value: identifier ;
@@ -601,14 +670,14 @@ unsigned_int:
   | unsigned_longlong_int
   ;
 
-signed_tiny_int: INT8 { /*$$ = new_idl_type_from_basic_type(idl_short); FIXME: */};
-unsigned_tiny_int: UINT8 { /*$$ = new_idl_type_from_basic_type(idl_ushort); FIXME: */};
-signed_short_int: INT16 { /*$$ = new_idl_type_from_basic_type(idl_short);*/ };
-signed_long_int: INT32 { /*$$ = new_idl_type_from_basic_type(idl_long);*/ };
-signed_longlong_int: INT64 { /*$$ = new_idl_type_from_basic_type(idl_longlong);*/ };
-unsigned_short_int: UINT16 { /*$$ = new_idl_type_from_basic_type(idl_ushort);*/ };
-unsigned_long_int: UINT32 { /*$$ = new_idl_type_from_basic_type(idl_ulong);*/ };
-unsigned_longlong_int: UINT64 { /*$$ = new_idl_type_from_basic_type(idl_ulonglong);*/ };
+signed_tiny_int: INT8 { $$ = idl_int8; };
+unsigned_tiny_int: UINT8 { $$ = idl_uint8; };
+signed_short_int: INT16 { $$ = idl_short; };
+signed_long_int: INT32 { $$ = idl_long; };
+signed_longlong_int: INT64 { $$ = idl_longlong; };
+unsigned_short_int: UINT16 { $$ = idl_ushort; };
+unsigned_long_int: UINT32 { $$ = idl_ulong; };
+unsigned_longlong_int: UINT64 { $$ = idl_ulonglong; };
 
 // From Building Block Anonymous Types:
 type_spec: template_type_spec ;
@@ -619,9 +688,11 @@ definition: annotation_dcl ';' ;
 
 annotation_dcl:
     annotation_header '{' annotation_bodys '}'
+      { idl_annotation_close(context); }
   ;
 annotation_header:
-     ANNOTATION identifier
+    ANNOTATION identifier
+      { idl_add_annotation_open(context, $2); }
   ;
 
 annotation_bodys:
@@ -637,10 +708,14 @@ annotation_body:
   ;
 
 annotation_member:
-    annotation_member_type simple_declarator default_opt ';'
+    annotation_member_type simple_declarator
+      { idl_add_annotation_member_open(context, $1, $2); }
+    default_opt ';'
+      { idl_annotation_member_close(context); }
   ;
 default_opt:
     DEFAULT const_expr ';'
+      { idl_annotation_member_set_default(context, $2); }
   |
   ;
 
@@ -650,7 +725,7 @@ annotation_member_type:
 /*  | scoped_name -- included in const_type */ 
   ;
 
-any_const_type: ANY ;
+any_const_type: ANY { $$ = idl_any; };
 
 annotation_appls:
     annotation_appl annotation_appls
@@ -658,7 +733,10 @@ annotation_appls:
   ;
 
 annotation_appl: 
-    '@' scoped_name annotation_appl_params_opt
+    '@' scoped_name
+      { idl_add_annotation_appl_open(context, $2); }
+    annotation_appl_params_opt
+      { idl_annotation_appl_close(context); }
   ;
 annotation_appl_params_opt:
     '(' annotation_appl_params ')'
@@ -667,6 +745,7 @@ annotation_appl_params_opt:
 
 annotation_appl_params:
     const_expr
+      { idl_add_annotation_appl_expr(context, $1); }
   | annotation_appl_param_list
   ;
 
@@ -677,6 +756,7 @@ annotation_appl_param_list:
 
 annotation_appl_param:
     identifier '=' const_expr
+      { idl_add_annotation_appl_param(context, $1, $3); }
   ;
 
 identifier:
@@ -688,7 +768,6 @@ identifier:
         } else if (idl_parser_token_matches_keyword($1) != 0) {
           /* FIXME: come up with a better error message */
           yyerror(&yylloc, scanner, context, "Identifier matches a keyword");
-          fprintf(stderr, "'%s'\n", $1);
           YYABORT;
         } else if (($$ = strdup($1 + offset)) == NULL) {
           /* FIXME: come up with a better error message */

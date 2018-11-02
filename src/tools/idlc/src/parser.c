@@ -13,6 +13,7 @@
 #include <errno.h>
 #include <stdio.h>
 #include <string.h>
+#include <stdbool.h>
 
 #define YYSTYPE IDL_PARSER_STYPE
 #define YYLTYPE IDL_PARSER_LTYPE
@@ -20,11 +21,12 @@
 #define YY_TYPEDEF_YY_SCANNER_T
 typedef void* yyscan_t;
 
+#include "parser.h"
 #include "idl.parser.h"
 #include "yy_decl.h"
 #include "idl.lexer.h"
 
-int
+extern int
 idl_parse_file(const char *file)
 {
   int err = 0;
@@ -36,8 +38,8 @@ idl_parse_file(const char *file)
     err = errno;
     fprintf(stderr, "Cannot open %s: %s", file, strerror(err));
   } else {
-    YYSTYPE yystype;
-    YYLTYPE yyltype;
+    /* FIXME: YYSTYPE yystype; */
+    /* FIXME: YYLTYPE yyltype; */
     yyscan_t scanner;
 
     idl_parser_lex_init(&scanner);
@@ -50,8 +52,8 @@ idl_parse_file(const char *file)
   return err;
 }
 
-int
-idl_parse_string(const char *str, int ignore_yyerror)
+extern int
+idl_parse_string(const char *str, bool ignore_yyerror)
 {
   int err = 0;
 
@@ -60,8 +62,8 @@ idl_parse_string(const char *str, int ignore_yyerror)
     fprintf(stderr, "String argument is NULL\n");
     err = -1;
   } else {
-    YYSTYPE yystype;
-    YYLTYPE yyltype;
+    /* FIXME: YYSTYPE yystype; */
+    /* FIXME: YYLTYPE yyltype; */
     yyscan_t scanner;
 
     idl_parser_lex_init(&scanner);
@@ -74,4 +76,4 @@ idl_parse_string(const char *str, int ignore_yyerror)
 
   return err;
 }
-  
+ 

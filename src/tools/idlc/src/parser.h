@@ -13,7 +13,7 @@
 #define IDL_PARSER_H
 
 int idl_parse_file(const char *file);
-int idl_parse_string(const char *str, int ignore_yyerror);
+int idl_parse_string(const char *str, bool ignore_yyerror);
 
 #endif /* IDL_PARSER_H */
 

@@ -9,12 +9,13 @@
 #
 # SPDX-License-Identifier: EPL-2.0 OR BSD-3-Clause
 #
-project(idlpp C)
-cmake_minimum_required(VERSION 3.6)
+#project(idlpp C)
+#cmake_minimum_required(VERSION 3.6)
 
 # Find Bison and Flex
 find_package(BISON REQUIRED)
 find_package(FLEX REQUIRED)
+find_package(Abstraction REQUIRED)
 
 # Create directory where Bison and Flex generated sources will be placed.
 set(GENERATED_SOURCE_DIR "${CMAKE_BINARY_DIR}/src/tools/idlc/src")
@@ -31,16 +32,18 @@ flex_target(
   COMPILE_FLAGS
     "--header-file=${GENERATED_SOURCE_DIR}/idl.lexer.h")
 
-add_executable(idlpp "src/main.c" "src/parser.c" "src/tools.c" "${BISON_parser_OUTPUTS}" "${FLEX_lexer_OUTPUTS}")
+add_executable(idlpp "src/main.c" "src/parser.c" "src/tools.c" "src/type.c" "${BISON_parser_OUTPUTS}" "${FLEX_lexer_OUTPUTS}")
 target_include_directories(idlpp PRIVATE "${CMAKE_SOURCE_DIR}")
 target_include_directories(idlpp PRIVATE "${CMAKE_SOURCE_DIR}/os/include")
 target_include_directories(idlpp PRIVATE "include")
 target_include_directories(idlpp PRIVATE "src")
 target_include_directories(idlpp PRIVATE "${GENERATED_SOURCE_DIR}")
-add_executable("idlpptest" "src/maintest.c" "src/parser.c" "src/tools.c" "${BISON_parser_OUTPUTS}" "${FLEX_lexer_OUTPUTS}")
-target_include_directories("idlpptest" PRIVATE "${CMAKE_SOURCE_DIR}")
-target_include_directories("idlpptest" PRIVATE "${CMAKE_SOURCE_DIR}/os/include")
-target_include_directories("idlpptest" PRIVATE "include")
-target_include_directories("idlpptest" PRIVATE "src")
-target_include_directories("idlpptest" PRIVATE "${GENERATED_SOURCE_DIR}")
+
+target_link_libraries(idlpp PRIVATE OSAPI)
+
+get_target_property(os_api_src_dir OSAPI SOURCE_DIR)
+# We need to expose some of the OS headers as well.
+target_include_directories(idlpp
+    PUBLIC
+        "$<BUILD_INTERFACE:${os_api_src_dir}/include>")
 

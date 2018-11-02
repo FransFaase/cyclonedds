@@ -91,7 +91,7 @@ idl_strncasecmp_c(const char *s1, const char *s2, size_t n)
 
 #undef lc
 
-int
+char
 idl_unescape_char(const char *str, const char **endptr)
 {
   int i, chr = 0;
@@ -138,5 +138,5 @@ idl_unescape_char(const char *str, const char **endptr)
     *endptr = end;
   }
 
-  return chr;
+  return (char)(unsigned char)(chr & 0xff);
 }
