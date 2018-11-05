@@ -68,9 +68,10 @@ idl_parse_string(const char *str, bool ignore_yyerror)
 
     idl_parser_lex_init(&scanner);
     idl_parser__scan_string(str, scanner);
-    idl_context_t context;
-    context.ignore_yyerror = ignore_yyerror;
-    err = idl_parser_parse(scanner, &context);
+    idl_context_t *context = idl_create_context();
+    idl_context_set_ignore_yyerror(context, ignore_yyerror);
+    err = idl_parser_parse(scanner, context);
+    idl_free_context(context);
     idl_parser_lex_destroy(scanner);
   }
 

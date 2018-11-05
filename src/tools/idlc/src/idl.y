@@ -23,8 +23,6 @@
 
 typedef void *yyscan_t;
 
-//#include "os/os_stdlib.h"
-
 #include "idl.parser.h"
 #include "yy_decl.h" /* prevent implicit declaration of yylex */
 
@@ -41,9 +39,7 @@ idl_parser_token_matches_keyword(const char *token);
 
 %code requires {
 
-#include <stdbool.h>
-/* FIXME: */
-#include "type.h"
+#include "type_create.h"
 
 }
 
@@ -216,24 +212,23 @@ definition:
   ;
 
 module_dcl:
-    annotation_appls MODULE identifier { idl_add_module_open(context, $3); }
+    annotation_appls MODULE identifier
+       { idl_module_open(context, $3); }
     '{' definitions '}'
        { idl_module_close(context); };
 
 scoped_name:
-     identifier
-       { $$ = idl_new_scoped_name(context, 0, false, $1); }
-   | "::" identifier
-       { $$ = idl_new_scoped_name(context, 0, true, $2); }
-   | scoped_name "::" identifier
-       { $$ = idl_new_scoped_name(context, $1, false, $3); } 
-   ;
+    identifier
+      { $$ = idl_new_scoped_name(context, 0, false, $1); }
+  | "::" identifier
+      { $$ = idl_new_scoped_name(context, 0, true, $2); }
+  | scoped_name "::" identifier
+      { $$ = idl_new_scoped_name(context, $1, false, $3); } 
+  ;
 
 const_dcl:
     annotation_appls CONST const_type identifier '=' const_expr
-      { /* FIXME: printf("const_type is of: %d\n", ($2)->basic_type); */
-        idl_print_literal(stderr, $6); fprintf(stderr, "\n");
-      }
+      { idl_add_const_def(context, $3, $4, $6); }
   ;
 
 const_type:
@@ -792,7 +787,7 @@ yyerror(
   YYLTYPE *yylloc, yyscan_t yyscanner, idl_context_t *context, char *text)
 {
   /* FIXME: implement */
-  if (context != 0 && context->ignore_yyerror != 0) {
+  if (idl_context_get_ignore_yyerror(context)) {
     return 0;
   }
 
