@@ -44,6 +44,7 @@ typedef os_handle (*ddsi_tran_handle_fn_t) (ddsi_tran_base_t);
 typedef int (*ddsi_tran_listen_fn_t) (ddsi_tran_listener_t);
 typedef void (*ddsi_tran_free_fn_t) (void);
 typedef void (*ddsi_tran_peer_locator_fn_t) (ddsi_tran_conn_t, nn_locator_t *);
+typedef void (*ddsi_tran_disable_multiplexing_fn_t) (ddsi_tran_conn_t);
 typedef ddsi_tran_conn_t (*ddsi_tran_accept_fn_t) (ddsi_tran_listener_t);
 typedef ddsi_tran_conn_t (*ddsi_tran_create_conn_fn_t) (uint32_t, ddsi_tran_qos_t);
 typedef ddsi_tran_listener_t (*ddsi_tran_create_listener_fn_t) (int port, ddsi_tran_qos_t);
@@ -75,7 +76,7 @@ typedef enum ddsi_locator_from_string_result (*ddsi_locator_from_string_fn_t) (d
 
 typedef char * (*ddsi_locator_to_string_fn_t) (ddsi_tran_factory_t tran, char *dst, size_t sizeof_dst, const nn_locator_t *loc, int with_port);
 
-typedef int (*ddsi_enumerate_interfaces_fn_t) (ddsi_tran_factory_t tran, int max, struct os_ifAttributes_s *interfs);
+typedef int (*ddsi_enumerate_interfaces_fn_t) (ddsi_tran_factory_t tran, os_ifaddrs_t **interfs);
 
 /* Data types */
 
@@ -102,6 +103,7 @@ struct ddsi_tran_conn
   ddsi_tran_read_fn_t m_read_fn;
   ddsi_tran_write_fn_t m_write_fn;
   ddsi_tran_peer_locator_fn_t m_peer_locator_fn;
+  ddsi_tran_disable_multiplexing_fn_t m_disable_multiplexing_fn;
 
   /* Data */
 
@@ -209,6 +211,7 @@ void ddsi_factory_conn_init (ddsi_tran_factory_t factory, ddsi_tran_conn_t conn)
 OSAPI_EXPORT ssize_t ddsi_conn_write (ddsi_tran_conn_t conn, const nn_locator_t *dst, size_t niov, const ddsi_iovec_t *iov, uint32_t flags);
 ssize_t ddsi_conn_read (ddsi_tran_conn_t conn, unsigned char * buf, size_t len, nn_locator_t *srcloc);
 bool ddsi_conn_peer_locator (ddsi_tran_conn_t conn, nn_locator_t * loc);
+void ddsi_conn_disable_multiplexing (ddsi_tran_conn_t conn);
 void ddsi_conn_add_ref (ddsi_tran_conn_t conn);
 void ddsi_conn_free (ddsi_tran_conn_t conn);
 
@@ -237,7 +240,7 @@ enum ddsi_locator_from_string_result ddsi_locator_from_string (nn_locator_t *loc
 char *ddsi_locator_to_string (char *dst, size_t sizeof_dst, const nn_locator_t *loc);
 char *ddsi_locator_to_string_no_port (char *dst, size_t sizeof_dst, const nn_locator_t *loc);
 
-int ddsi_enumerate_interfaces (ddsi_tran_factory_t factory, int max, struct os_ifAttributes_s *interfs);
+int ddsi_enumerate_interfaces (ddsi_tran_factory_t factory, os_ifaddrs_t **interfs);
 
 #define ddsi_listener_locator(s,l) (ddsi_tran_locator (&(s)->m_base,(l)))
 ddsi_tran_conn_t ddsi_listener_accept (ddsi_tran_listener_t listener);
