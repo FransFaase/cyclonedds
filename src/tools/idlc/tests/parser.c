@@ -13,6 +13,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
+#include "CUnit/Runner.h"
 
 #include "parser.h"
 
@@ -47,5 +48,24 @@ CUnit_Test(parser, basic)
   CU_ASSERT(test_parse("const short een = 6 + +3;", true));
   CU_ASSERT(test_parse("const short een = 6 - - 3;", true));
   CU_ASSERT(test_parse("const short een = 6 + ~(-3);", true));
-
 }
+
+bool test_parse_stringify(const char *input, const char *output)
+{
+  char buffer[1000];
+  idl_parse_string_stringify(input, buffer, 1000);
+  if (strcmp(buffer, output) == 0) {
+    return true;
+  }
+  fprintf(stderr, "Parsing: '%s'\n", input);
+  fprintf(stderr, "Expect:  '%s'\n", output);
+  fprintf(stderr, "Result:  '%s'\n", buffer);
+  return false;
+}
+
+CUnit_Test(parser, module)
+{
+
+  CU_ASSERT(test_parse_stringify("module a {};", "module {module a{}}"));
+}
+

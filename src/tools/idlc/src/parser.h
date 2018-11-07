@@ -15,5 +15,8 @@
 int idl_parse_file(const char *file);
 int idl_parse_string(const char *str, bool ignore_yyerror);
 
+// For testing:
+int idl_parse_string_stringify(const char *str, char *buffer, size_t len);
+
 #endif /* IDL_PARSER_H */
 

@@ -44,7 +44,7 @@ void idl_context_set_ignore_yyerror(idl_context_t* context, bool ignore_yyerror)
 bool idl_context_get_ignore_yyerror(idl_context_t* context);
 void idl_free_context(idl_context_t* context);
 
-idl_type_t *idl_new_basic_type(idl_context_t *context, idl_basic_type_t type);
+idl_type_t *idl_new_basic_type(idl_context_t *context, idl_basic_type_t basic_type);
 idl_type_t *idl_new_sequence_type(idl_context_t *context, idl_type_t *base, idl_literal_t size);
 idl_type_t *idl_new_sequence_type_unbound(idl_context_t *context, idl_type_t *base);
 idl_type_t *idl_new_string_type(idl_context_t *context, idl_literal_t size);

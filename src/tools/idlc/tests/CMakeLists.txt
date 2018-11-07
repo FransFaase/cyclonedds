@@ -12,5 +12,6 @@
 include(CUnit)
 
 add_cunit_executable(testidlc .)
-target_link_libraries(testidlc OSAPI)
+target_include_directories(testidlc PRIVATE "../src")
+target_link_libraries(testidlc OSAPI idlpplib)
 

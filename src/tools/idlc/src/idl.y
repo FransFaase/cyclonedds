@@ -507,7 +507,7 @@ enumerator_list:
   | enumerator
   ;
 
-enumerator: identifier { idl_add_enum_enumerator(context, $1); };
+enumerator: identifier { idl_add_enum_value(context, $1); };
 
 array_declarator:
     identifier 
@@ -791,7 +791,7 @@ yyerror(
     return 0;
   }
 
-  fprintf(stderr, "ERROR: %s\n", text);
+  fprintf(stderr, "ERROR: %d.%d %s\n", yylloc->first_line, yylloc->first_column, text);
   return 0;
 }
 

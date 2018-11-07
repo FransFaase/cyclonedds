@@ -119,16 +119,22 @@ extern void idl_eval_binary_oper(idl_operator_type_t operator_type, idl_literal_
   }
 }
 
-idl_type_t *idl_new_basic_type(idl_context_t *context, idl_basic_type_t type)
+idl_type_t *idl_new_basic_type(idl_context_t *context, idl_basic_type_t basic_type)
 {
-  (void)context;
-  (void)type;
+  assert(context != 0);
+  if (context == 0) {
+    return 0;
+  }
+  (void)basic_type;
   return 0;
 }
 
 idl_type_t *idl_new_sequence_type(idl_context_t *context, idl_type_t *base, idl_literal_t size)
 {
-  (void)context;
+  assert(context != 0);
+  if (context == 0) {
+    return 0;
+  }
   (void)base;
   (void)size;
   return 0;
@@ -136,27 +142,39 @@ idl_type_t *idl_new_sequence_type(idl_context_t *context, idl_type_t *base, idl_
 
 idl_type_t *idl_new_sequence_type_unbound(idl_context_t *context, idl_type_t *base)
 {
-  (void)context;
+  assert(context != 0);
+  if (context == 0) {
+    return 0;
+  }
   (void)base;
   return 0;
 }
 
 idl_type_t *idl_new_string_type(idl_context_t *context, idl_literal_t size)
 {
-  (void)context;
+  assert(context != 0);
+  if (context == 0) {
+    return 0;
+  }
   (void)size;
   return 0;
 }
 
 idl_type_t *idl_new_string_type_unbound(idl_context_t *context)
 {
-  (void)context;
+  assert(context != 0);
+  if (context == 0) {
+    return 0;
+  }
   return 0;
 }
 
 idl_type_t *idl_new_fixed_type(idl_context_t *context, idl_literal_t digits, idl_literal_t precision)
 {
-  (void)context;
+  assert(context != 0);
+  if (context == 0) {
+    return 0;
+  }
   (void)digits;
   (void)precision;
   return 0;
@@ -164,7 +182,10 @@ idl_type_t *idl_new_fixed_type(idl_context_t *context, idl_literal_t digits, idl
 
 idl_type_t *idl_new_map_type(idl_context_t *context, idl_type_t *key_type, idl_type_t *value_type, idl_literal_t size)
 {
-  (void)context;
+  assert(context != 0);
+  if (context == 0) {
+    return 0;
+  }
   (void)key_type;
   (void)value_type;
   (void)size;
@@ -173,7 +194,10 @@ idl_type_t *idl_new_map_type(idl_context_t *context, idl_type_t *key_type, idl_t
 
 idl_type_t *idl_new_map_type_unbound(idl_context_t *context, idl_type_t *key_type, idl_type_t *value_type)
 {
-  (void)context;
+  assert(context != 0);
+  if (context == 0) {
+    return 0;
+  }
   (void)key_type;
   (void)value_type;
   return 0;
@@ -181,7 +205,10 @@ idl_type_t *idl_new_map_type_unbound(idl_context_t *context, idl_type_t *key_typ
 
 idl_scoped_name_t *idl_new_scoped_name(idl_context_t *context, idl_scoped_name_t* prev, bool top, idl_identifier_t  name)
 {
-  (void)context;
+  assert(context != 0);
+  if (context == 0) {
+    return 0;
+  }
   (void)prev;
   (void)top;
   (void)name;
@@ -190,32 +217,67 @@ idl_scoped_name_t *idl_new_scoped_name(idl_context_t *context, idl_scoped_name_t
 
 idl_basic_type_t idl_get_basic_type_of_scoped_name(idl_context_t *context, idl_scoped_name_t* scoped_name)
 {
-  (void)context;
+  assert(context != 0);
+  if (context == 0) {
+    return 0;
+  }
   (void)scoped_name;
   return idl_boolean;
 }
 
 idl_bit_value_list_t *idl_new_bit_value_list(idl_context_t *context, idl_identifier_t name, idl_bit_value_list_t *next)
 {
-  (void)context;
+  assert(context != 0);
+  if (context == 0) {
+    return 0;
+  }
   (void)name;
   (void)next;
   return 0;
+}
+
+static idl_definition_t *idl_new_definition(idl_identifier_t  name, idl_definition_type_t type, idl_definition_t *parent)
+{
+  idl_definition_t *result = (idl_definition_t*)os_malloc(sizeof(idl_definition_t));
+  result->name = os_strdup(name);
+  result->type = type;
+  result->parent = parent;
+  result->next = 0;
+  /* result->def not initialized */
+  return result;
+}
+
+static void idl_append_definition(idl_definition_t *definition, idl_definition_t **ref_definition)
+{
+  while ((*ref_definition) != 0) {
+    ref_definition = &(*ref_definition)->next;
+  }
+  (*ref_definition) = definition;
+}
+
+static idl_definition_t *idl_new_module_definition(idl_identifier_t name, idl_definition_t *parent)
+{
+  idl_definition_t *def = idl_new_definition(name, idl_definition_module, parent);
+  def->module_def = (idl_module_definition_t*)os_malloc(sizeof(idl_module_definition_t));
+  if (parent != 0 && parent->type == idl_definition_module) {
+    idl_append_definition(def, &parent->module_def->definitions);
+  }
+  return def;
 }
 
 extern idl_context_t* idl_create_context()
 {
   idl_context_t *context = (idl_context_t*)os_malloc(sizeof(idl_context_t));
   context->ignore_yyerror = false;
-  context->root_definitions = 0;
-  context->cur_definitions = &context->root_definitions;
+  context->root_scope = idl_new_module_definition("", 0);
+  context->cur_scope = context->root_scope;
   return context;
 }
 
 extern void idl_context_set_ignore_yyerror(idl_context_t *context, bool ignore_yyerror)
 {
-  assert(context != 0);
   if (context == 0) {
+    assert(0);
     return;
   }
   context->ignore_yyerror = ignore_yyerror;
@@ -223,8 +285,8 @@ extern void idl_context_set_ignore_yyerror(idl_context_t *context, bool ignore_y
 
 extern bool idl_context_get_ignore_yyerror(idl_context_t *context)
 {
-  assert(context != 0);
   if (context == 0) {
+    assert(0);
     return false;
   }
   return context->ignore_yyerror;
@@ -232,28 +294,39 @@ extern bool idl_context_get_ignore_yyerror(idl_context_t *context)
 
 extern void idl_free_context(idl_context_t *context)
 {
-  assert(context != 0);
   if (context == 0) {
+    assert(0);
     return;
   }
   os_free(context);
 }
 
+static bool cur_scope_is_definition_type(idl_context_t *context, idl_definition_type_t type)
+{
+  return context != 0 && context->cur_scope != 0 && context->cur_scope->type == type;
+}
+
 extern void idl_module_open(idl_context_t *context, idl_identifier_t name)
 { 
-  assert(context != 0);
-  if (context == 0) {
+  if (!cur_scope_is_definition_type(context, idl_definition_module)) {
+    assert(0);
     return;
   }
-  (void)name; 
+  idl_definition_t *new_module = idl_new_module_definition(name, context->cur_scope);
+  context->cur_scope = new_module;
 }
 
 extern void idl_module_close(idl_context_t *context)
 {
-  assert(context != 0);
-  if (context == 0) {
+  if (!cur_scope_is_definition_type(context, idl_definition_module)) {
+    assert(0);
     return;
   }
+  if (context->cur_scope->parent != 0) {
+    assert(0);
+    return;
+  }
+  context->cur_scope = context->cur_scope->parent;
 }
 
 void idl_add_struct_forward(idl_context_t *context, idl_identifier_t name)
@@ -409,28 +482,47 @@ void idl_add_const_def(idl_context_t *context, idl_basic_type_t basic_type, idl_
 
 void idl_add_enum_open(idl_context_t *context, idl_identifier_t name)
 {
-  assert(context != 0);
-  if (context == 0) {
+  if (!cur_scope_is_definition_type(context, idl_definition_module)) {
+    assert(0);
     return;
   }
-  (void)name;
+
+  idl_definition_t *def = idl_new_definition(name, idl_definition_enum, context->cur_scope);
+  idl_append_definition(def, &context->cur_scope->module_def->definitions);
+  def->enum_def = (idl_enum_definition_t*)os_malloc(sizeof(idl_enum_definition_t));
+  def->enum_def->values = 0;
+  def->enum_def->nr_values = 0;
+  context->cur_scope = def;
 }
 
-void idl_add_enum_enumerator(idl_context_t *context, idl_identifier_t name)
+void idl_add_enum_value(idl_context_t *context, idl_identifier_t name)
 {
-  assert(context != 0);
-  if (context == 0) {
+  if (   !cur_scope_is_definition_type(context, idl_definition_enum)
+      || context->cur_scope->parent == 0 || context->cur_scope->type != idl_definition_module) {
+    assert(0);
     return;
   }
-  (void)name;
+  idl_definition_t *def = idl_new_definition(name, idl_definition_enum, context->cur_scope);
+  idl_append_definition(def, &context->cur_scope->parent->module_def->definitions);
+  def->enum_value_def = (idl_enum_value_definition_t*)os_malloc(sizeof(idl_enum_value_definition_t));
+  def->enum_value_def->enum_def = context->cur_scope->enum_def;
+  def->enum_value_def->next = 0;
+  def->enum_value_def->nr = context->cur_scope->enum_def->nr_values++;
+
+  idl_enum_value_definition_t **ref_value = &context->cur_scope->enum_def->values;
+  while ((*ref_value) != 0) {
+    ref_value = &(*ref_value)->next;
+  }
+  (*ref_value) = def->enum_value_def;
 }
 
 void idl_enum_close(idl_context_t *context)
 {
-  assert(context != 0);
-  if (context == 0) {
+  if (!cur_scope_is_definition_type(context, idl_definition_enum)) {
+    assert(0);
     return;
   }
+  context->cur_scope = context->cur_scope->parent;
 }
 
 void idl_add_array_open(idl_context_t *context, idl_identifier_t  name)
@@ -548,33 +640,17 @@ void idl_annotation_appl_close(idl_context_t *context)
   }
 }
 
-static idl_definition_t *idl_new_definition(idl_identifier_t  name, idl_definition_type_t type)
-{
-  idl_definition_t *result = (idl_definition_t*)os_malloc(sizeof(idl_definition_t));
-  result->name = os_strdup(name);
-  result->type = type;
-  result->next = 0;
-  /* result->def not initialized */
-  return result;
-}
-
 extern void idl_add_const_definition(idl_context_t *context, idl_identifier_t name, idl_literal_t value)
 {
-  idl_definition_t **ref_definitions = 0;
-
-  assert(context != 0);
-  if (context == 0) {
+  if (!cur_scope_is_definition_type(context, idl_definition_module)) {
+    assert(0);
     return;
   }
 
-  ref_definitions = context->cur_definitions;
-  while (*ref_definitions != 0) {
-    ref_definitions = &(*ref_definitions)->next;
-  }
-
-  *ref_definitions = idl_new_definition(name, idl_definition_const);
-  (*ref_definitions)->def.const_def = (idl_const_definition_t*)os_malloc(sizeof(idl_const_definition_t));
-  (*ref_definitions)->def.const_def->value = value;
+  idl_definition_t *def = idl_new_definition(name, idl_definition_const, context->cur_scope);
+  idl_append_definition(def, &context->cur_scope->module_def->definitions);
+  def->const_def = (idl_const_definition_t*)os_malloc(sizeof(idl_const_definition_t));
+  def->const_def->value = value;
 }
   
 idl_const_definition_t *idl_get_const_definition(idl_definition_t *definitions, idl_identifier_t name)
@@ -583,7 +659,7 @@ idl_const_definition_t *idl_get_const_definition(idl_definition_t *definitions, 
   for (; definition != 0; definition = definition->next) {
     if (strcmp(definition->name, name) == 0) {
       if (definition->type == idl_definition_const) {
-        return definition->def.const_def;
+        return definition->const_def;
       } else {
 	/* FIXME: report error that definition is not a const definition */
 	return 0;

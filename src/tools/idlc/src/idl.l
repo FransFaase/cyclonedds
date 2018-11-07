@@ -96,6 +96,9 @@ boolean                   { return(BOOLEAN); }
 octet                     { return(OCTET); }
 any                       { return(ANY); }
 
+module                    { return(MODULE); }
+enum                      { return(ENUM); }
+
 TRUE                      {
                             yylval->boolean = true;
                             return(BOOLEAN_LITERAL);
