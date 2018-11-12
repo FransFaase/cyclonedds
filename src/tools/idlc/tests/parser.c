@@ -53,19 +53,16 @@ CUnit_Test(parser, basic)
 bool test_parse_stringify(const char *input, const char *output)
 {
   char buffer[1000];
-  idl_parse_string_stringify(input, buffer, 1000);
-  if (strcmp(buffer, output) == 0) {
-    return true;
-  }
-  fprintf(stderr, "Parsing: '%s'\n", input);
-  fprintf(stderr, "Expect:  '%s'\n", output);
-  fprintf(stderr, "Result:  '%s'\n", buffer);
-  return false;
+  idl_parse_string_stringify(input, buffer, 500);
+  return strcmp(buffer, output) == 0;
 }
 
 CUnit_Test(parser, module)
 {
 
-  CU_ASSERT(test_parse_stringify("module a {};", "module {module a{}}"));
+  CU_ASSERT(test_parse_stringify("enum e{x, y};", "enum e{x,y,}"));
+  CU_ASSERT(test_parse_stringify("enum e{x, z};", "enum e{x,z,}"));
+  CU_ASSERT(test_parse_stringify("const short een = 1;", ""));
+  //CU_ASSERT(test_parse_stringify("module a { enum e{x};};", "module a{enum e{x,}}"));
 }
 

@@ -44,15 +44,15 @@ static void idl_ostream_emit(idl_ostream_t *stream, const char *s)
   *stream->s = '\0';
 }
 
-static void idl_stringify_module(idl_module_it_t *module_it, idl_ostream_t *stream)
+static void idl_stringify_module_content(idl_module_it_t *module_it, idl_ostream_t *stream)
 {
-  idl_ostream_emit(stream, "module ");
-  idl_ostream_emit(stream, idl_module_it_name(module_it));
-  idl_ostream_emit(stream, "{");
-
   idl_module_it_t *child_module_it = idl_create_module_it(module_it);
   for (; idl_module_it_more(child_module_it); idl_module_it_next(child_module_it)) {
-    idl_stringify_module(child_module_it, stream);
+    idl_ostream_emit(stream, "module ");
+    idl_ostream_emit(stream, idl_module_it_name(child_module_it));
+    idl_ostream_emit(stream, "{");
+    idl_stringify_module_content(child_module_it, stream);
+    idl_ostream_emit(stream, "}");
   }
   idl_free_module_it(&child_module_it);
 
@@ -71,7 +71,6 @@ static void idl_stringify_module(idl_module_it_t *module_it, idl_ostream_t *stre
     idl_ostream_emit(stream, "}");
   }
   idl_free_enum_it(&enum_it);
-  idl_ostream_emit(stream, "}");
 }
 
 extern void idl_stringify(idl_context_t *context, char *buffer, size_t len)
@@ -80,7 +79,7 @@ extern void idl_stringify(idl_context_t *context, char *buffer, size_t len)
   idl_ostream_init(&stream, buffer, len);
 
   idl_module_it_t *module_it = idl_create_module_it_from_context(context);
-  idl_stringify_module(module_it, &stream);
+  idl_stringify_module_content(module_it, &stream);
   idl_free_module_it(&module_it);
 
 }

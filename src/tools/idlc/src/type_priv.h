@@ -78,6 +78,7 @@ typedef struct {
 } idl_enum_definition_t;
 
 struct idl_enum_value_definition {
+  idl_definition_t *def;
   idl_enum_definition_t *enum_def;
   idl_enum_value_definition_t *next;
   int nr;

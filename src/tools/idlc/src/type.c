@@ -307,26 +307,30 @@ static bool cur_scope_is_definition_type(idl_context_t *context, idl_definition_
 }
 
 extern void idl_module_open(idl_context_t *context, idl_identifier_t name)
-{ 
+{
+  //fprintf(stderr, "idl_module_open %s\n", name);	
   if (!cur_scope_is_definition_type(context, idl_definition_module)) {
     assert(0);
     return;
   }
   idl_definition_t *new_module = idl_new_module_definition(name, context->cur_scope);
   context->cur_scope = new_module;
+  //fprintf(stderr, " cur scope %s\n", context->cur_scope->name);
 }
 
 extern void idl_module_close(idl_context_t *context)
 {
+  //fprintf(stderr, "idl_module_close\n");
   if (!cur_scope_is_definition_type(context, idl_definition_module)) {
     assert(0);
     return;
   }
-  if (context->cur_scope->parent != 0) {
+  if (context->cur_scope->parent == 0) {
     assert(0);
     return;
   }
   context->cur_scope = context->cur_scope->parent;
+  //fprintf(stderr, " cur scope %s\n", context->cur_scope->name);
 }
 
 void idl_add_struct_forward(idl_context_t *context, idl_identifier_t name)
@@ -497,14 +501,16 @@ void idl_add_enum_open(idl_context_t *context, idl_identifier_t name)
 
 void idl_add_enum_value(idl_context_t *context, idl_identifier_t name)
 {
+  //fprintf(stderr, "add_enum_value %s\n", name);
   if (   !cur_scope_is_definition_type(context, idl_definition_enum)
-      || context->cur_scope->parent == 0 || context->cur_scope->type != idl_definition_module) {
+      || context->cur_scope->parent == 0 || context->cur_scope->parent->type != idl_definition_module) {
     assert(0);
     return;
   }
-  idl_definition_t *def = idl_new_definition(name, idl_definition_enum, context->cur_scope);
+  idl_definition_t *def = idl_new_definition(name, idl_definition_enum_value, context->cur_scope);
   idl_append_definition(def, &context->cur_scope->parent->module_def->definitions);
   def->enum_value_def = (idl_enum_value_definition_t*)os_malloc(sizeof(idl_enum_value_definition_t));
+  def->enum_value_def->def = def;
   def->enum_value_def->enum_def = context->cur_scope->enum_def;
   def->enum_value_def->next = 0;
   def->enum_value_def->nr = context->cur_scope->enum_def->nr_values++;
@@ -514,6 +520,7 @@ void idl_add_enum_value(idl_context_t *context, idl_identifier_t name)
     ref_value = &(*ref_value)->next;
   }
   (*ref_value) = def->enum_value_def;
+  //fprintf(stderr, " added to %s\n", context->cur_scope->name);
 }
 
 void idl_enum_close(idl_context_t *context)
