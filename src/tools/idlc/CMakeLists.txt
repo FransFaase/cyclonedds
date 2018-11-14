@@ -33,7 +33,7 @@ flex_target(
   COMPILE_FLAGS
     "--header-file=${GENERATED_SOURCE_DIR}/idl.lexer.h")
 
-add_library(idlpplib "src/parser.c" "src/tools.c" "src/type.c" "src/type_api.c" "src/stringify.c" "${BISON_parser_OUTPUTS}" "${FLEX_lexer_OUTPUTS}")
+add_library(idlpplib "src/parser.c" "src/tools.c" "src/type.c" "src/type_api.c" "src/type_walker.c" "src/stringify.c" "${BISON_parser_OUTPUTS}" "${FLEX_lexer_OUTPUTS}")
 target_include_directories(idlpplib PRIVATE "${CMAKE_SOURCE_DIR}")
 target_include_directories(idlpplib PRIVATE "${CMAKE_SOURCE_DIR}/os/include")
 target_include_directories(idlpplib PRIVATE "include")

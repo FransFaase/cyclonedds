@@ -60,9 +60,13 @@ bool test_parse_stringify(const char *input, const char *output)
 CUnit_Test(parser, module)
 {
 
-  CU_ASSERT(test_parse_stringify("enum e{x, y};", "enum e{x,y,}"));
   CU_ASSERT(test_parse_stringify("enum e{x, z};", "enum e{x,z,}"));
-  CU_ASSERT(test_parse_stringify("const short een = 1;", ""));
-  //CU_ASSERT(test_parse_stringify("module a { enum e{x};};", "module a{enum e{x,}}"));
+  CU_ASSERT(test_parse_stringify("const short een = 1; enum e{x, z};", "enum e{x,z,}"));
+  CU_ASSERT(test_parse_stringify("module a { enum e{x};};", "module a{enum e{x,}}"));
+  CU_ASSERT(test_parse_stringify("module a{enum f{y};}; module a { enum e{x};};", "module a{enum f{y,}enum e{x,}}"));
+  CU_ASSERT(test_parse_stringify("struct s {char c;};","struct s{c,;}"));
+  CU_ASSERT(test_parse_stringify("struct s {char c,b;};","struct s{c,b,;}"));
+  CU_ASSERT(test_parse_stringify("struct s {char c;char d,e;};","struct s{c,;d,e,;}"));
+  CU_ASSERT(test_parse_stringify("union u switch (char) {case 'c': char d; default: short d;};","union u{c:d,;d:d,;}"));
 }
 

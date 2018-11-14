@@ -27,6 +27,7 @@ typedef void* yyscan_t;
 #include "idl.lexer.h"
 
 extern void idl_stringify(idl_context_t *context, char *buffer, size_t len);
+extern void idl_stringify2(idl_context_t *context, char *buffer, size_t len);
 
 extern int
 idl_parse_file(const char *file)
@@ -112,6 +113,7 @@ int idl_parse_string_stringify(const char *str, char *buffer, size_t len)
       buffer[len-1] = '\0';
     } else {
       idl_stringify(context, buffer, len);
+      idl_stringify2(context, buffer, len);
     }
 
     idl_free_context(context);

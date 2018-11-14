@@ -97,6 +97,11 @@ octet                     { return(OCTET); }
 any                       { return(ANY); }
 
 module                    { return(MODULE); }
+struct                    { return(STRUCT); }
+union                     { return(UNION); }
+switch                    { return(SWITCH); }
+case                      { return(CASE); }
+default                   { return(DEFAULT); }
 enum                      { return(ENUM); }
 
 TRUE                      {

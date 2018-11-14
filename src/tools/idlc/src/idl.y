@@ -212,7 +212,7 @@ definition:
   ;
 
 module_dcl:
-    annotation_appls MODULE identifier
+    annotation_appls "module" identifier
        { idl_module_open(context, $3); }
     '{' definitions '}'
        { idl_module_close(context); };
@@ -227,7 +227,7 @@ scoped_name:
   ;
 
 const_dcl:
-    annotation_appls CONST const_type identifier '=' const_expr
+    annotation_appls "const" const_type identifier '=' const_expr
       { idl_add_const_def(context, $3, $4, $6); }
   ;
 
@@ -430,7 +430,7 @@ struct_dcl:
   ;
 
 struct_def:
-    annotation_appls STRUCT identifier '{'
+    annotation_appls "struct" identifier '{'
       { idl_add_struct_open(context, $3); }
     members '}' 
       { idl_struct_close(context); }
@@ -455,7 +455,7 @@ union_dcl:
   ;
 
 union_def:
-    annotation_appls UNION identifier SWITCH '(' switch_type_spec ')'
+    annotation_appls "union" identifier "switch" '(' switch_type_spec ')'
        { idl_add_union_open(context, $3, $6); }
     '{' switch_body '}'
        { idl_union_close(context); }
@@ -483,8 +483,8 @@ case_labels:
   ;
 
 case_label:
-    CASE const_expr ':' { idl_add_union_case_label(context, $2); }
-  | DEFAULT ':' { idl_add_union_case_default(context); }
+    "case" const_expr ':' { idl_add_union_case_label(context, $2); }
+  | "default" ':' { idl_add_union_case_default(context); }
   ;
 
 element_spec:

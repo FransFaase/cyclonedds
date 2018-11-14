@@ -61,14 +61,66 @@ typedef struct idl_definition idl_definition_t;
 
 typedef enum {
   idl_definition_module,
+  idl_definition_struct_forward,
+  idl_definition_struct,
+  idl_definition_union_forward,
+  idl_definition_union,
+  idl_definition_declarator,
   idl_definition_enum,
   idl_definition_enum_value,
   idl_definition_const
 } idl_definition_type_t;
 
+// Module:
+
 typedef struct {
   idl_definition_t *definitions;
 } idl_module_definition_t;
+
+// Struct:
+
+typedef struct {
+  bool defined;
+} idl_struct_forward_t;
+
+typedef struct idl_struct_member idl_struct_member_t;
+struct idl_struct_member {
+  idl_type_t *type;
+  idl_definition_t *declarators;
+  idl_struct_member_t *next;
+};
+
+typedef struct {
+  idl_struct_member_t *members;
+} idl_struct_t;
+
+// Union:
+
+typedef struct {
+  bool defined;
+} idl_union_forward_t;
+
+typedef struct idl_union_case_label idl_union_case_label_t;
+struct idl_union_case_label {
+  bool is_default;
+  idl_literal_t value;
+  idl_union_case_label_t *next;
+};
+
+typedef struct idl_union_case idl_union_case_t;
+struct idl_union_case {
+  idl_union_case_label_t *labels;
+  idl_type_t *element_type;
+  idl_definition_t *declarators;
+  idl_union_case_t *next;
+};
+
+typedef struct {
+  idl_basic_type_t switch_type;
+  idl_union_case_t *cases;
+} idl_union_t;
+
+// Enum:
 
 typedef struct idl_enum_value_definition idl_enum_value_definition_t;
 
@@ -84,15 +136,23 @@ struct idl_enum_value_definition {
   int nr;
 };
 
+// Const:
+
 typedef struct {
   idl_literal_t value;
 } idl_const_definition_t;
+
+// A definition:
 
 struct idl_definition {
   const char *name;
   idl_definition_type_t type;
   union {
     idl_module_definition_t *module_def;
+    idl_struct_forward_t *struct_forward_def;
+    idl_struct_t *struct_def;
+    idl_union_forward_t *union_forward_def;
+    idl_union_t *union_def;
     idl_enum_definition_t *enum_def;
     idl_enum_value_definition_t *enum_value_def;
     idl_const_definition_t *const_def;
@@ -105,6 +165,9 @@ struct idl_context {
   bool ignore_yyerror;
   idl_definition_t *root_scope;
   idl_definition_t *cur_scope;
+  idl_definition_t **ref_next_declarator;
+  idl_union_case_t **ref_next_union_case;
+  idl_union_case_label_t **ref_next_union_case_label;
 };
 
 #endif /* IDL_TYPE_H */
