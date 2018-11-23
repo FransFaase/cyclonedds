@@ -34,7 +34,7 @@ main(int argc, char *argv[])
   }
   if (argc != 2) {
     usage(argv[0]);
-  } else if (idl_parse_file(argv[1]) == 0) {
+  } else if (dds_tt_parse_file(argv[1]) == 0) {
     ret = EXIT_SUCCESS;
   }
 
@@ -47,11 +47,11 @@ bool test_parse_stringify(const char *input, const char *output)
 {
   char buffer[1000];
   buffer[0] = '\0';
-  idl_parse_string_stringify(input, buffer, 1000);
+  fprintf(stderr, "Parsing: '%s'\n", input);
+  dds_tt_parse_string_stringify(input, buffer, 1000);
   //if (strcmp(buffer, output) == 0) {
   //  return true;
   //}
-  fprintf(stderr, "Parsing: '%s'\n", input);
   fprintf(stderr, "Expect:  '%s'\n", output);
   //fprintf(stderr, "Result:  '%s'\n", buffer);
   fprintf(stderr, "Result:  '");

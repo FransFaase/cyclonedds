@@ -9,16 +9,16 @@
  *
  * SPDX-License-Identifier: EPL-2.0 OR BSD-3-Clause
  */
-#ifndef IDL_YY_DECL_H
-#define IDL_YY_DECL_H
+#ifndef DDS_TT_YY_DECL_H
+#define DDS_TT_YY_DECL_H
 
-#define YY_DECL int idl_parser_lex \
+#define YY_DECL int dds_tt_parser_lex \
   (YYSTYPE * yylval_param, \
    YYLTYPE * yylloc_param, \
    yyscan_t yyscanner, \
-   idl_context_t *context)
+   dds_tt_context_t *context)
 
 extern YY_DECL;
 
-#endif /* IDL_YY_DECL_H */
+#endif /* DDS_TT_YY_DECL_H */
 

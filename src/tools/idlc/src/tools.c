@@ -14,15 +14,6 @@
 
 #include "tools.h"
 
-static int
-tolower_c(int c)
-{
-  if (c >= 'A' && c <= 'Z') {
-    return c - 'A';
-  }
-
-  return c;
-}
 
 static int
 toxdigit_c(int c)
@@ -50,51 +41,11 @@ isxdigit_c(int c)
   return 0;
 }
 
-#define lc(c) tolower_c(c)
-
-int
-idl_strcasecmp_c(const char *s1, const char *s2)
+unsigned long
+dds_tt_unescape_wchar(const char *str, const char **endptr)
 {
-  int eq;
-
-  assert(s1 != NULL);
-  assert(s2 != NULL);
-
-  eq = tolower_c(*s1) - tolower_c(*s2);
-  while (*s1 && *s2 && eq == 0) {
-    s1++;
-    s2++;
-    eq = tolower_c(*s1) - tolower_c(*s2);
-  }
-
-  return eq;
-}
-
-int
-idl_strncasecmp_c(const char *s1, const char *s2, size_t n)
-{
-  size_t i;
-  int eq = 0;
-
-  assert(s1 != NULL);
-  assert(s2 != NULL);
-
-  for (i = 0;
-       i < n && (eq = lc(s1[i]) - lc(s2[i])) == 0 && s1[i] && s2[i];
-       i++)
-  {
-    /* do nothing */
-  }
-
-  return eq;
-}
-
-#undef lc
-
-char
-idl_unescape_char(const char *str, const char **endptr)
-{
-  int i, chr = 0;
+  int i;
+  unsigned long chr = 0;
   const char *end;
 
   assert(str != NULL);
@@ -107,6 +58,11 @@ idl_unescape_char(const char *str, const char **endptr)
       end = str + i;
     } else if ((str[1] == 'x' || str[1] == 'X') && isxdigit_c(str[2])) {
       for (i = 2; i <= 3 && isxdigit_c(str[i]); i++) {
+        chr = (chr * 16) + toxdigit_c(str[i]);
+      }
+      end = str + i;
+    } else if (str[1] == 'u' && isxdigit_c(str[2])) {
+      for (i = 2; i <= 6 && isxdigit_c(str[i]); i++) {
         chr = (chr * 16) + toxdigit_c(str[i]);
       }
       end = str + i;
@@ -137,6 +93,11 @@ idl_unescape_char(const char *str, const char **endptr)
   if (endptr != NULL) {
     *endptr = end;
   }
+}
 
-  return (char)(unsigned char)(chr & 0xff);
+char
+dds_tt_unescape_char(const char *str, const char **endptr)
+{
+  unsigned long wchar = dds_tt_unescape_wchar(str, endptr);
+  return (char)(unsigned char)(wchar & 0xff);
 }

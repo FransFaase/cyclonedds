@@ -29,7 +29,7 @@ bool test_parse(const char *str, bool okay)
   return true;
 }
 
-CUnit_Test(parser, basic)
+CU_Test(parser, basic)
 {
 
   CU_ASSERT(test_parse("", false));
@@ -57,7 +57,7 @@ bool test_parse_stringify(const char *input, const char *output)
   return strcmp(buffer, output) == 0;
 }
 
-CUnit_Test(parser, module)
+CU_Test(parser, module)
 {
 
   CU_ASSERT(test_parse_stringify("enum e{x, z};", "enum e{x,z,}"));

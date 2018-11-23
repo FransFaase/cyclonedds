@@ -12,6 +12,7 @@
 #ifndef IDL_TOOLS_H
 #define IDL_TOOLS_H
 
-char idl_unescape_char(const char *str, const char **endptr);
+char dds_tt_unescape_char(const char *str, const char **endptr);
+unsigned long dds_tt_unescape_wchar(const char *str, const char **endptr);
 
 #endif /* IDL_TOOLS_H */

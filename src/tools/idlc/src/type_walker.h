@@ -10,29 +10,29 @@
  * SPDX-License-Identifier: EPL-2.0 OR BSD-3-Clause
  */
 
-typedef struct idl_walker idl_walker_t;
+typedef struct dds_tt_walker dds_tt_walker_t;
 
-idl_walker_t *idl_create_walker(idl_context_t *context);
-void idl_walker_def_proc(idl_walker_t *walker, const char *name);
-void idl_walker_for_all_modules(idl_walker_t *walker);
-void idl_walker_for_all_structs(idl_walker_t *walker);
-void idl_walker_for_all_members(idl_walker_t *walker);
-void idl_walker_for_all_unions(idl_walker_t *walker);
-void idl_walker_for_all_cases(idl_walker_t *walker);
-void idl_walker_for_all_case_labels(idl_walker_t *walker);
-void idl_walker_if_default_case_label(idl_walker_t *walker);
-void idl_walker_for_all_declarators(idl_walker_t *walker);
-void idl_walker_for_all_enums(idl_walker_t *walker);
-void idl_walker_for_all_enum_value(idl_walker_t *walker);
-void idl_walker_else(idl_walker_t *walker);
-void idl_walker_end_if(idl_walker_t *walker);
-void idl_walker_end_for(idl_walker_t *walker);
-void idl_walker_emit_name(idl_walker_t *walker);
-void idl_walker_emit(idl_walker_t *walker, const char *text);
-void idl_walker_end_def(idl_walker_t *walker);
-void idl_walker_call_proc(idl_walker_t *walker, const char *name);
-void idl_walker_main(idl_walker_t *walker);
-void idl_walker_end(idl_walker_t *walker);
-void idl_walker_execute(idl_walker_t *walker, char *buffer, size_t len);
+dds_tt_walker_t *dds_tt_create_walker(dds_tt_node_t *root_node);
+void dds_tt_walker_def_proc(dds_tt_walker_t *walker, const char *name);
+void dds_tt_walker_for_all_modules(dds_tt_walker_t *walker);
+void dds_tt_walker_for_all_structs(dds_tt_walker_t *walker);
+void dds_tt_walker_for_all_members(dds_tt_walker_t *walker);
+void dds_tt_walker_for_all_unions(dds_tt_walker_t *walker);
+void dds_tt_walker_for_all_cases(dds_tt_walker_t *walker);
+void dds_tt_walker_for_all_case_labels(dds_tt_walker_t *walker);
+void dds_tt_walker_if_default_case_label(dds_tt_walker_t *walker);
+void dds_tt_walker_for_all_declarators(dds_tt_walker_t *walker);
+void dds_tt_walker_for_all_enums(dds_tt_walker_t *walker);
+void dds_tt_walker_for_all_enum_value(dds_tt_walker_t *walker);
+void dds_tt_walker_else(dds_tt_walker_t *walker);
+void dds_tt_walker_end_if(dds_tt_walker_t *walker);
+void dds_tt_walker_end_for(dds_tt_walker_t *walker);
+void dds_tt_walker_emit_name(dds_tt_walker_t *walker);
+void dds_tt_walker_emit(dds_tt_walker_t *walker, const char *text);
+void dds_tt_walker_end_def(dds_tt_walker_t *walker);
+void dds_tt_walker_call_proc(dds_tt_walker_t *walker, const char *name);
+void dds_tt_walker_main(dds_tt_walker_t *walker);
+void dds_tt_walker_end(dds_tt_walker_t *walker);
+void dds_tt_walker_execute(dds_tt_walker_t *walker, char *buffer, size_t len);
 
 

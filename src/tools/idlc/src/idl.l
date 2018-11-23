@@ -18,8 +18,8 @@
 #include <string.h>
 
 /* YYSTYPE and YYLTYPE defines are required because idl.y defines api.prefix */
-#define YYSTYPE IDL_PARSER_STYPE
-#define YYLTYPE IDL_PARSER_LTYPE
+#define YYSTYPE DDS_TT_PARSER_STYPE
+#define YYLTYPE DDS_TT_PARSER_LTYPE
 
 #include "idl.parser.h"
 /* YY_DECL must be defined here because yyparse passes an additional argument */
@@ -44,11 +44,12 @@
 %x MULTILINE_COMMENT
 %x COMMENT
 %x STRING
+%x WSTRING
 
 %option noyywrap
 %option nounistd
 %option never-interactive
-%option prefix="idl_parser_"
+%option prefix="dds_tt_parser_"
 %option reentrant
 %option bison-bridge
 %option bison-locations
@@ -61,7 +62,7 @@ base_e                    ([eE]("+"|"-")?[0-9]+)
 floating_pt_number        ([0-9]+"."[0-9]*|"."[0-9]+)
 floating_pt_literal       ({floating_pt_number}{base_e}?|[0-9]+{base_e})
 fixed_pt_literal          ({floating_pt_number}[dD]|[0-9]+[dD])
-esc_sequence              ("\\"([ntvbrfa\\\?\'\"]|[0-7]{1,3}|[xX][a-fA-F0-9]{1,2}))
+esc_sequence              ("\\"([ntvbrfa\\\?\'\"]|[0-7]{1,3}|[xX][a-fA-F0-9]{1,2}|"u"[a-fA-F0-9]{1,4}))
 char_literal              ([^\n\t\'\\]|{esc_sequence})
 string_literal            ([^\n\t\"\\]|{esc_sequence})*
 identifier                [a-zA-Z_][a-zA-Z0-9_]*
@@ -117,7 +118,7 @@ FALSE                     {
 {integer_literal}         {
                             errno = 0;
                             /* strtoll recognizes if the value is dec, oct or hex if base is zero */
-                            yylval->literal.type = idl_integer_literal;
+                            yylval->literal.type = dds_tt_value_integer;
                             yylval->literal.value.llng = strtoll(yytext, NULL, 0); /* FIXME: use strtoll_l */
                             if (errno == ERANGE && (yylval->literal.value.llng == LLONG_MIN ||
                                                     yylval->literal.value.llng == LLONG_MAX))
@@ -129,7 +130,7 @@ FALSE                     {
 
 {floating_pt_literal}     {
                             errno = 0;
-                            yylval->literal.type = idl_floating_pt_literal;
+                            yylval->literal.type = dds_tt_value_floating_pt;
                             yylval->literal.value.ldbl = strtold(yytext, NULL); /* FIXME: use strtold_l */
                             if (errno == ERANGE && (yylval->literal.value.ldbl == HUGE_VALL ||
                                                     yylval->literal.value.ldbl == 0))
@@ -141,7 +142,7 @@ FALSE                     {
 
 {fixed_pt_literal}        {
                             errno = 0;
-                            yylval->literal.type = idl_fixed_pt_literal;
+                            yylval->literal.type = dds_tt_value_fixed_pt;
                             yylval->literal.value.ldbl = strtold(yytext, NULL); /* FIXME: use strtold_l */
                             if (errno == ERANGE && (yylval->literal.value.ldbl == HUGE_VALL ||
                                                     yylval->literal.value.ldbl == 0))
@@ -152,14 +153,20 @@ FALSE                     {
                           }
 
 "'"{char_literal}"'"      {
-                            yylval->literal.type = idl_character_literal;
-                            yylval->literal.value.chr = idl_unescape_char(yytext + 1, NULL);
+                            yylval->literal.type = dds_tt_value_character;
+                            yylval->literal.value.chr = dds_tt_unescape_char(yytext + 1, NULL);
                             return CHARACTER_LITERAL;
+                          }
+
+"L'"{char_literal}"'"      {
+                            yylval->literal.type = dds_tt_value_wide_character;
+                            yylval->literal.value.wchr = dds_tt_unescape_wchar(yytext + 1, NULL);
+                            return WIDE_CHARACTER_LITERAL;
                           }
 
 "\""                      { BEGIN(STRING); }
 <STRING>{string_literal}  {
-                            yylval->literal.type = idl_string_literal;
+                            yylval->literal.type = dds_tt_value_string;
                             yylval->literal.value.str = strdup(yytext);
                             if (yylval->literal.value.str == NULL) {
                               perror("Could not copy string_literal"); /* FIXME: use yyerror */
@@ -167,6 +174,17 @@ FALSE                     {
                             return STRING_LITERAL;
                           }
 <STRING>"\""              { BEGIN(INITIAL); }
+
+"L\""                     { BEGIN(WSTRING); }
+<WSTRING>{string_literal} {
+                            yylval->literal.type = dds_tt_value_string;
+                            yylval->literal.value.str = strdup(yytext);
+                            if (yylval->literal.value.str == NULL) {
+                              perror("Could not copy string_literal"); /* FIXME: use yyerror */
+                            }
+                            return WIDE_STRING_LITERAL;
+                          }
+<WSTRING>"\""             { BEGIN(INITIAL); }
 
 {identifier}              {
                             yylval->identifier = strdup(yytext);

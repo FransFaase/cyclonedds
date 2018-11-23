@@ -15,8 +15,8 @@
 #include <string.h>
 #include <stdbool.h>
 
-#define YYSTYPE IDL_PARSER_STYPE
-#define YYLTYPE IDL_PARSER_LTYPE
+#define YYSTYPE DDS_TT_PARSER_STYPE
+#define YYLTYPE DDS_TT_PARSER_LTYPE
 
 #define YY_TYPEDEF_YY_SCANNER_T
 typedef void* yyscan_t;
@@ -26,11 +26,10 @@ typedef void* yyscan_t;
 #include "yy_decl.h"
 #include "idl.lexer.h"
 
-extern void idl_stringify(idl_context_t *context, char *buffer, size_t len);
-extern void idl_stringify2(idl_context_t *context, char *buffer, size_t len);
+extern void dds_tt_stringify(dds_tt_node_t *root_node, char *buffer, size_t len);
 
 extern int
-idl_parse_file(const char *file)
+dds_tt_parse_file(const char *file)
 {
   int err = 0;
   FILE *fh;
@@ -45,17 +44,17 @@ idl_parse_file(const char *file)
     /* FIXME: YYLTYPE yyltype; */
     yyscan_t scanner;
 
-    idl_parser_lex_init(&scanner);
-    idl_parser_set_in(fh, scanner);
-    idl_context_t *context = idl_create_context();
-    err = idl_parser_parse(scanner, context);
+    dds_tt_parser_lex_init(&scanner);
+    dds_tt_parser_set_in(fh, scanner);
+    dds_tt_context_t *context = dds_tt_create_context();
+    err = dds_tt_parser_parse(scanner, context);
     if (err == 0) {
        char buffer[1000];
-       idl_stringify(context, buffer, 1000);
+       dds_tt_stringify(dds_tt_context_get_root_node(context), buffer, 1000);
        printf("Result: '%s'\n", buffer);
     }
-    idl_free_context(context);
-    idl_parser_lex_destroy(scanner);
+    dds_tt_free_context(context);
+    dds_tt_parser_lex_destroy(scanner);
     (void)fclose(fh);
   }
 
@@ -63,7 +62,7 @@ idl_parse_file(const char *file)
 }
 
 extern int
-idl_parse_string(const char *str, bool ignore_yyerror)
+dds_tt_parse_string(const char *str, bool ignore_yyerror)
 {
   int err = 0;
 
@@ -76,13 +75,13 @@ idl_parse_string(const char *str, bool ignore_yyerror)
     /* FIXME: YYLTYPE yyltype; */
     yyscan_t scanner;
 
-    idl_parser_lex_init(&scanner);
-    idl_parser__scan_string(str, scanner);
-    idl_context_t *context = idl_create_context();
-    idl_context_set_ignore_yyerror(context, ignore_yyerror);
-    err = idl_parser_parse(scanner, context);
-    idl_free_context(context);
-    idl_parser_lex_destroy(scanner);
+    dds_tt_parser_lex_init(&scanner);
+    dds_tt_parser__scan_string(str, scanner);
+    dds_tt_context_t *context = dds_tt_create_context();
+    dds_tt_context_set_ignore_yyerror(context, ignore_yyerror);
+    err = dds_tt_parser_parse(scanner, context);
+    dds_tt_free_context(context);
+    dds_tt_parser_lex_destroy(scanner);
   }
 
   return err;
@@ -90,7 +89,7 @@ idl_parse_string(const char *str, bool ignore_yyerror)
 
 /* For testing: */
 
-int idl_parse_string_stringify(const char *str, char *buffer, size_t len)
+int dds_tt_parse_string_stringify(const char *str, char *buffer, size_t len)
 {
   int err = 0;
 
@@ -103,21 +102,20 @@ int idl_parse_string_stringify(const char *str, char *buffer, size_t len)
     /* FIXME: YYLTYPE yyltype; */
     yyscan_t scanner;
 
-    idl_parser_lex_init(&scanner);
-    idl_parser__scan_string(str, scanner);
-    idl_context_t *context = idl_create_context();
-    idl_context_set_ignore_yyerror(context, false);
-    err = idl_parser_parse(scanner, context);
+    dds_tt_parser_lex_init(&scanner);
+    dds_tt_parser__scan_string(str, scanner);
+    dds_tt_context_t *context = dds_tt_create_context();
+    dds_tt_context_set_ignore_yyerror(context, false);
+    err = dds_tt_parser_parse(scanner, context);
     if (err != 0) {
       strncpy(buffer, "PARSING ERROR", len);
       buffer[len-1] = '\0';
     } else {
-      idl_stringify(context, buffer, len);
-      idl_stringify2(context, buffer, len);
+      dds_tt_stringify(dds_tt_context_get_root_node(context), buffer, len);
     }
 
-    idl_free_context(context);
-    idl_parser_lex_destroy(scanner);
+    dds_tt_free_context(context);
+    dds_tt_parser_lex_destroy(scanner);
   }
 
   return err;

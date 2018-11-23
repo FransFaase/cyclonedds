@@ -11,7 +11,10 @@
 #
 include(CUnit)
 
-add_cunit_executable(testidlc .)
+set(sources
+  "parser.c")
+
+add_cunit_executable(testidlc ${sources})
 target_include_directories(testidlc PRIVATE "../src")
 target_link_libraries(testidlc OSAPI idlpplib)
 
