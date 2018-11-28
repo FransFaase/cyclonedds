@@ -49,6 +49,10 @@ before_install:
 
 install:
   - if [ "${TRAVIS_OS_NAME}" = "osx" ]; then
+      brew install bison flex;
+      brew link --force bison flex;
+      export PATH="/usr/local/opt/bison/bin:$PATH";
+      export LDFLAGS="-L/usr/local/opt/bison/lib";
       brew install pyenv-virtualenv;
       eval "$(pyenv init -)";
       pyenv virtualenv conan;
