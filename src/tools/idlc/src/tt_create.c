@@ -22,37 +22,33 @@ struct dds_tt_context {
   bool ignore_yyerror;
   dds_tt_node_t *root_node;
   dds_tt_node_t *cur_node;
-  dds_tt_definition_t **ref_next_declarator;
-  dds_tt_union_case_t **ref_next_union_case;
-  //dds_tt_union_case_label_t **ref_next_union_case_label;
+  dds_tt_node_t *parent_for_declarator;
+  dds_tt_union_case_t *cur_union_case;
 };
 
-void dds_tt_print_literal(FILE* f, dds_tt_value_t literal)
+void dds_tt_print_literal(FILE* f, dds_tt_literal_t literal)
 {
-  switch (literal.type) {
-    case dds_tt_value_integer:
-      fprintf(f, "integer %lld", literal.value.llng);
+  switch (literal.flags) {
+    case DDS_TT_LONG_LONG_TYPE:
+      fprintf(f, "integer %lld", literal.llng);
       break;
-    case dds_tt_value_string:
-      fprintf(f, "string '%s'", literal.value.str);
+    case DDS_TT_STRING_TYPE:
+      fprintf(f, "string '%s'", literal.str);
       break;
-    case dds_tt_value_wide_string:
-      fprintf(f, "wstring '%s'", literal.value.str);
+    case DDS_TT_WIDE_STRING_TYPE:
+      fprintf(f, "wstring '%s'", literal.str);
       break;
-    case dds_tt_value_character:
-      fprintf(f, "char '%c'", literal.value.chr);
+    case DDS_TT_CHAR_TYPE:
+      fprintf(f, "char '%c'", literal.chr);
       break;
-    case dds_tt_value_wide_character:
-      fprintf(f, "wchar u%4lX", literal.value.wchr);
+    case DDS_TT_WIDE_CHAR_TYPE:
+      fprintf(f, "wchar u%4lX", literal.wchr);
       break;
-    case dds_tt_value_fixed_pt:
-      fprintf(f, "fixed %Lf", literal.value.ldbl);
+    case DDS_TT_DOUBLE_TYPE:
+      fprintf(f, "fixed %Lf", literal.ldbl);
       break;
-    case dds_tt_value_floating_pt:
-      fprintf(f, "float %Lf", literal.value.ldbl);
-      break;
-    case dds_tt_value_boolean:
-      fprintf(f, "boolean: %s", literal.value.bln ? "true" : "false");
+    case DDS_TT_BOOLEAN_TYPE:
+      fprintf(f, "boolean: %s", literal.bln ? "true" : "false");
       break;
     default:
       fprintf(f, "illegal-type");
@@ -60,38 +56,35 @@ void dds_tt_print_literal(FILE* f, dds_tt_value_t literal)
   }
 }
 
-static int dds_tt_compare_literal(dds_tt_value_t lhs, dds_tt_value_t rhs)
+static int dds_tt_compare_literal(dds_tt_literal_t lhs, dds_tt_literal_t rhs)
 {
-  if (lhs.type < rhs.type) {
+  if (lhs.flags < rhs.flags) {
     return -1;
   }
-  if (lhs.type > rhs.type) {
+  if (lhs.flags > rhs.flags) {
     return +1;
   }
-  switch (lhs.type) {
-    case dds_tt_value_integer:
-      return lhs.value.llng < rhs.value.llng ? -1 : lhs.value.llng > rhs.value.llng ? +1 : 0;
+  switch (lhs.flags) {
+    case DDS_TT_LONG_LONG_TYPE:
+      return lhs.llng < rhs.llng ? -1 : lhs.llng > rhs.llng ? +1 : 0;
       break;
-    case dds_tt_value_string:
-      return strcmp(lhs.value.str, rhs.value.str);
+    case DDS_TT_STRING_TYPE:
+      return strcmp(lhs.str, rhs.str);
       break;
-    case dds_tt_value_wide_string:
+    case DDS_TT_WIDE_STRING_TYPE:
       assert(false);
       break;
-    case dds_tt_value_character:
-      return lhs.value.chr < rhs.value.chr ? -1 : lhs.value.chr > rhs.value.chr ? +1 : 0;
+    case DDS_TT_CHAR_TYPE:
+      return lhs.chr < rhs.chr ? -1 : lhs.chr > rhs.chr ? +1 : 0;
       break;
-    case dds_tt_value_wide_character:
+    case DDS_TT_WIDE_CHAR_TYPE:
       assert(false);
       break;
-    case dds_tt_value_fixed_pt:
-      assert(false);
+    case DDS_TT_LONG_DOUBLE_TYPE:
+      return lhs.ldbl < rhs.ldbl ? -1 : lhs.ldbl > rhs.ldbl ? +1 : 0;
       break;
-    case dds_tt_value_floating_pt:
-      return lhs.value.ldbl < rhs.value.ldbl ? -1 : lhs.value.ldbl > rhs.value.ldbl ? +1 : 0;
-      break;
-    case dds_tt_value_boolean:
-      return (!lhs.value.bln && rhs.value.bln) ? -1 : (lhs.value.bln && !rhs.value.bln) ? +1 : 0;
+    case DDS_TT_BOOLEAN_TYPE:
+      return (!lhs.bln && rhs.bln) ? -1 : (lhs.bln && !rhs.bln) ? +1 : 0;
       break;
     default:
       assert(false);
@@ -100,44 +93,47 @@ static int dds_tt_compare_literal(dds_tt_value_t lhs, dds_tt_value_t rhs)
   return -1;
 }
 
-static bool dds_tt_check_literal_type(dds_tt_value_t value, dds_tt_base_type_t *base_type)
+static bool dds_tt_check_literal_type(dds_tt_literal_t value, dds_tt_base_type_t *base_type)
 {
+  (void)value;
+  (void)base_type;
+/*
   switch (value.type) {
-    case dds_tt_value_integer:
+    case DDS_TT_LONG_LONG_TYPE:
       switch (base_type->flags) {
 	case DDS_TT_INT8_TYPE:
-	  return -(1L << 7) <= value.value.llng && value.value.llng < (1L << 7);
+	  return -(1L << 7) <= value.llng && value.llng < (1L << 7);
 	  break;
 	case DDS_TT_SHORT_TYPE:
-	  return -(1L << 15) <= value.value.llng && value.value.llng < (1L << 15);
+	  return -(1L << 15) <= value.llng && value.llng < (1L << 15);
 	  break;
 	case DDS_TT_LONG_TYPE:
-	  return -(1LL << 31) <= value.value.llng && value.value.llng < (1LL << 31);
+	  return -(1LL << 31) <= value.llng && value.llng < (1LL << 31);
 	  break;
 	case DDS_TT_LONG_LONG_TYPE:
 	  return true;
 	  break;
 	case DDS_TT_UINT8_TYPE:
-	  return 0 <= value.value.llng && value.value.llng < (1L << 8);
+	  return 0 <= value.llng && value.llng < (1L << 8);
 	  break;
 	case DDS_TT_UNSIGNED_SHORT_TYPE:
-	  return 0 <= value.value.llng && value.value.llng < (1L << 16);
+	  return 0 <= value.llng && value.llng < (1L << 16);
 	  break;
 	case DDS_TT_UNSIGNED_LONG_TYPE:
-	  return 0 <= value.value.llng && value.value.llng < (1LL << 32);
+	  return 0 <= value.llng && value.llng < (1LL << 32);
 	  return true;
 	  break;
 	case DDS_TT_UNSIGNED_LONG_LONG_TYPE:
-	  return 0 <= value.value.llng;
+	  return 0 <= value.llng;
 	  break;
 	default:
 	  break;
       }
       break;
-    case dds_tt_value_character:
+    case DDS_TT_CHAR_TYPE:
       return base_type->flags == DDS_TT_CHAR_TYPE;
       break;
-    case dds_tt_value_wide_character:
+    case DDS_TT_WIDE_CHAR_TYPE:
       return base_type->flags == DDS_TT_WIDE_CHAR_TYPE;
       break;
     case dds_tt_value_fixed_pt:
@@ -153,22 +149,23 @@ static bool dds_tt_check_literal_type(dds_tt_value_t value, dds_tt_base_type_t *
       assert(false);
       break;
   }
-  return false;
+*/
+  return true;
 }
 
-extern void dds_tt_eval_unary_oper(dds_tt_operator_type_t operator_type, dds_tt_value_t operand, dds_tt_value_t *result)
+extern void dds_tt_eval_unary_oper(dds_tt_operator_type_t operator_type, dds_tt_literal_t operand, dds_tt_literal_t *result)
 {
-  if (operand.type == dds_tt_value_integer) {
-    result->type = dds_tt_value_integer;
+  if (operand.flags == DDS_TT_LONG_LONG_TYPE) {
+    result->flags = DDS_TT_LONG_LONG_TYPE;
     switch (operator_type) {
       case dds_tt_operator_minus:
-	result->value.llng = -operand.value.llng;
+	result->llng = -operand.llng;
 	break;
       case dds_tt_operator_plus:
-	result->value.llng = operand.value.llng;
+	result->llng = operand.llng;
 	break;
       case dds_tt_operator_inv:
-	result->value.llng = ~operand.value.llng;
+	result->llng = ~operand.llng;
 	break;
       default:
 	assert(false);
@@ -179,40 +176,40 @@ extern void dds_tt_eval_unary_oper(dds_tt_operator_type_t operator_type, dds_tt_
   }
 }
 
-extern void dds_tt_eval_binary_oper(dds_tt_operator_type_t operator_type, dds_tt_value_t lhs, dds_tt_value_t rhs, dds_tt_value_t *result)
+extern void dds_tt_eval_binary_oper(dds_tt_operator_type_t operator_type, dds_tt_literal_t lhs, dds_tt_literal_t rhs, dds_tt_literal_t *result)
 {
-  if (lhs.type == dds_tt_value_integer && rhs.type == dds_tt_value_integer) {
-    result->type = dds_tt_value_integer;
+  if (lhs.flags == DDS_TT_LONG_LONG_TYPE && rhs.flags == DDS_TT_LONG_LONG_TYPE) {
+    result->flags = DDS_TT_LONG_LONG_TYPE;
     switch (operator_type) {
       case dds_tt_operator_or:
-	result->value.llng = lhs.value.llng | rhs.value.llng;
+	result->llng = lhs.llng | rhs.llng;
 	break;
       case dds_tt_operator_xor:
-	result->value.llng = lhs.value.llng ^ rhs.value.llng;
+	result->llng = lhs.llng ^ rhs.llng;
 	break;
       case dds_tt_operator_and:
-	result->value.llng = lhs.value.llng & rhs.value.llng;
+	result->llng = lhs.llng & rhs.llng;
 	break;
       case dds_tt_operator_shift_left:
-	result->value.llng = lhs.value.llng << rhs.value.llng;
+	result->llng = lhs.llng << rhs.llng;
 	break;
       case dds_tt_operator_shift_right:
-	result->value.llng = lhs.value.llng >> rhs.value.llng;
+	result->llng = lhs.llng >> rhs.llng;
 	break;
       case dds_tt_operator_add:
-	result->value.llng = lhs.value.llng + rhs.value.llng;
+	result->llng = lhs.llng + rhs.llng;
 	break;
       case dds_tt_operator_sub:
-	result->value.llng = lhs.value.llng - rhs.value.llng;
+	result->llng = lhs.llng - rhs.llng;
 	break;
       case dds_tt_operator_times:
-	result->value.llng = lhs.value.llng * rhs.value.llng;
+	result->llng = lhs.llng * rhs.llng;
 	break;
       case dds_tt_operator_div:
-	result->value.llng = lhs.value.llng / rhs.value.llng;
+	result->llng = lhs.llng / rhs.llng;
 	break;
       case dds_tt_operator_mod:
-	result->value.llng = lhs.value.llng % rhs.value.llng;
+	result->llng = lhs.llng % rhs.llng;
 	break;
       default:
 	assert(false);
@@ -253,30 +250,30 @@ dds_tt_type_spec_t *dds_tt_new_base_type(dds_tt_context_t *context, dds_tt_node_
   return (dds_tt_type_spec_t*)base_type;
 }
 
-static dds_tt_type_spec_t *new_sequence_type(dds_tt_type_spec_t *base, bool bounded, unsigned long long max)
+static dds_tt_type_spec_t *new_sequence_type(dds_tt_type_spec_t *element_type, bool bounded, unsigned long long max)
 {
-  dds_tt_sequence_type_t *sequence_type = (dds_tt_base_type_t*)os_malloc(sizeof(dds_tt_base_type_t));
+  dds_tt_sequence_type_t *sequence_type = (dds_tt_sequence_type_t*)os_malloc(sizeof(dds_tt_sequence_type_t));
   if (sequence_type == NULL) {
     abort();
   }
   init_node((dds_tt_node_t*)sequence_type, DDS_TT_SEQUENCE_TYPE, NULL);
-  sequence_type->base = base;
+  sequence_type->element_type = element_type;
   sequence_type->bounded = bounded;
   sequence_type->max = max;
   return (dds_tt_type_spec_t*)sequence_type;
 }
 
-dds_tt_type_spec_t *dds_tt_new_sequence_type(dds_tt_context_t *context, dds_tt_type_spec_t *base, dds_tt_value_t size)
+dds_tt_type_spec_t *dds_tt_new_sequence_type(dds_tt_context_t *context, dds_tt_type_spec_t *base, dds_tt_literal_t size)
 {
   (void)context;
-  assert(size.type == dds_tt_value_integer);
-  return new_sequence_type(base, false, size.value.llng);
+  assert(size.type == DDS_TT_LONG_LONG_TYPE);
+  return new_sequence_type(base, true, size.ullng);
 }
 
 dds_tt_type_spec_t *dds_tt_new_sequence_type_unbound(dds_tt_context_t *context, dds_tt_type_spec_t *base)
 {
   (void)context;
-  return new_sequence_type(base, true, 0);
+  return new_sequence_type(base, false, 0);
 }
 
 static dds_tt_type_spec_t *new_string_type(dds_tt_node_flags_t flags, bool bounded, unsigned long long max)
@@ -291,64 +288,77 @@ static dds_tt_type_spec_t *new_string_type(dds_tt_node_flags_t flags, bool bound
   return (dds_tt_type_spec_t*)string_type;
 }
 
-dds_tt_type_spec_t *dds_tt_new_string_type(dds_tt_context_t *context, dds_tt_value_t size)
+dds_tt_type_spec_t *dds_tt_new_string_type(dds_tt_context_t *context, dds_tt_literal_t size)
 {
   (void)context;
-  assert(size.type == dds_tt_value_integer);
-  if (size.value.llng < 0) {
+  assert(size.type == DDS_TT_LONG_LONG_TYPE);
+  if (size.llng < 0) {
     /* FIXME: report error */
   }  
-  return new_string_type(DDS_TT_STRING_TYPE, false, (unsigned long long)size.value.llng);
+  return new_string_type(DDS_TT_STRING_TYPE, true, (unsigned long long)size.llng);
 }
 
 dds_tt_type_spec_t *dds_tt_new_string_type_unbound(dds_tt_context_t *context)
 {
   (void)context;
-  return new_string_type(DDS_TT_STRING_TYPE, true, 0);
+  return new_string_type(DDS_TT_STRING_TYPE, false, 0);
 }
 
-dds_tt_type_spec_t *dds_tt_new_wide_string_type(dds_tt_context_t *context, dds_tt_value_t size)
+dds_tt_type_spec_t *dds_tt_new_wide_string_type(dds_tt_context_t *context, dds_tt_literal_t size)
 {
   (void)context;
-  assert(size.type == dds_tt_value_integer);
-  if (size.value.llng < 0) {
+  assert(size.type == DDS_TT_LONG_LONG_TYPE);
+  if (size.llng < 0) {
     /* FIXME: report error */
   }  
-  return new_string_type(DDS_TT_WIDE_STRING_TYPE, false, (unsigned long long)size.value.llng);
+  return new_string_type(DDS_TT_WIDE_STRING_TYPE, true, (unsigned long long)size.llng);
 }
 
 dds_tt_type_spec_t *dds_tt_new_wide_string_type_unbound(dds_tt_context_t *context)
 {
   (void)context;
-  return new_string_type(DDS_TT_WIDE_STRING_TYPE, true, 0);
+  return new_string_type(DDS_TT_WIDE_STRING_TYPE, false, 0);
 }
 
-dds_tt_type_spec_t *dds_tt_new_fixed_type(dds_tt_context_t *context, dds_tt_value_t digits, dds_tt_value_t fraction_digits)
+dds_tt_type_spec_t *dds_tt_new_fixed_type(dds_tt_context_t *context, dds_tt_literal_t digits, dds_tt_literal_t fraction_digits)
 {
-  assert(context != NULL);
   (void)context;
-  (void)digits;
-  (void)fraction_digits;
-  return NULL;
+  dds_tt_fixed_pt_type_t *fixed_pt_type = (dds_tt_fixed_pt_type_t*)os_malloc(sizeof(dds_tt_fixed_pt_type_t));
+  if (fixed_pt_type == NULL) {
+    abort();
+  }
+  init_node((dds_tt_node_t*)fixed_pt_type, DDS_TT_FIXED_PT_TYPE, NULL);
+  assert(digits.type == DDS_TT_LONG_LONG_TYPE);
+  fixed_pt_type->digits = (unsigned long long)digits.llng;
+  assert(fraction_digits.type == DDS_TT_LONG_LONG_TYPE);
+  fixed_pt_type->fraction_digits = (unsigned long long)fraction_digits.llng;
+  return (dds_tt_type_spec_t*)fixed_pt_type;
 }
 
-dds_tt_type_spec_t *dds_tt_new_map_type(dds_tt_context_t *context, dds_tt_type_spec_t *key_type, dds_tt_type_spec_t *value_type, dds_tt_value_t size)
+static dds_tt_type_spec_t *new_map_type(dds_tt_context_t *context, dds_tt_type_spec_t *key_type, dds_tt_type_spec_t *value_type, bool bounded, unsigned long long max)
 {
-  assert(context != NULL);
   (void)context;
-  (void)key_type;
-  (void)value_type;
-  (void)size;
-  return NULL;
+  dds_tt_map_type_t *map_type = (dds_tt_map_type_t*)os_malloc(sizeof(dds_tt_map_type_t));
+  if (map_type == NULL) {
+    abort();
+  }
+  init_node((dds_tt_node_t*)map_type, DDS_TT_MAP_TYPE, NULL);
+  map_type->key_type = key_type;
+  map_type->value_type = value_type;
+  map_type->bounded = bounded;
+  map_type->max = max;
+  return (dds_tt_type_spec_t*)map_type;
+}
+
+dds_tt_type_spec_t *dds_tt_new_map_type(dds_tt_context_t *context, dds_tt_type_spec_t *key_type, dds_tt_type_spec_t *value_type, dds_tt_literal_t size)
+{
+  assert(size.type == DDS_TT_LONG_LONG_TYPE);
+  return new_map_type(context, key_type, value_type, true, (unsigned long long)size.llng); 
 }
 
 dds_tt_type_spec_t *dds_tt_new_map_type_unbound(dds_tt_context_t *context, dds_tt_type_spec_t *key_type, dds_tt_type_spec_t *value_type)
 {
-  assert(context != NULL);
-  (void)context;
-  (void)key_type;
-  (void)value_type;
-  return NULL;
+  return new_map_type(context, key_type, value_type, false, 0); 
 }
 
 dds_tt_scoped_name_t *dds_tt_new_scoped_name(dds_tt_context_t *context, dds_tt_scoped_name_t* prev, bool top, dds_tt_identifier_t  name)
@@ -369,33 +379,45 @@ dds_tt_node_flags_t dds_tt_get_base_type_of_scoped_name(dds_tt_context_t *contex
   return DDS_TT_BOOLEAN_TYPE;
 }
 
-dds_tt_value_t dds_tt_get_value_of_scoped_name(dds_tt_context_t *context, dds_tt_scoped_name_t *scoped_name)
+dds_tt_literal_t dds_tt_get_value_of_scoped_name(dds_tt_context_t *context, dds_tt_scoped_name_t *scoped_name)
 {
   assert(context != NULL);
   (void)context;
   (void)scoped_name;
-  dds_tt_value_t result;
-  result.type = dds_tt_value_boolean;
-  result.value.bln = false;
+  dds_tt_literal_t result;
+  result.flags = DDS_TT_BOOLEAN_TYPE;
+  result.bln = false;
   return result;
 }
 
-static void init_definition(dds_tt_definition_t *definition, dds_tt_identifier_t name, dds_tt_node_flags_t flags, dds_tt_node_t *parent)
+static void init_annotated_node(dds_tt_context_t *context, dds_tt_annotated_node_t *annotated_node, dds_tt_node_flags_t flags, dds_tt_node_t *parent)
 {
-  init_node((dds_tt_node_t*)definition, flags, parent);
-  definition->name = os_strdup(name);
-  if (definition->name == NULL) {
-    abort();
+  init_node((dds_tt_node_t*)annotated_node, flags, parent);
+  annotated_node->annotations = NULL; /* FIXME: should get these from the context */
+  (void)context;
+  
+}
+static void init_definition(dds_tt_context_t *context, dds_tt_definition_t *definition, dds_tt_identifier_t name, dds_tt_node_flags_t flags, dds_tt_node_t *parent)
+{
+  init_annotated_node(context, (dds_tt_annotated_node_t*)definition, flags, parent);
+  if (name != NULL) {
+    definition->name = os_strdup(name);
+    if (definition->name == NULL) {
+      abort();
+    }
   }
+  else {
+    definition->name = NULL;
+  } 
 }
 
-static dds_tt_module_t *dds_tt_new_module_definition(dds_tt_identifier_t name, dds_tt_node_t *parent)
+static dds_tt_module_t *dds_tt_new_module_definition(dds_tt_context_t *context, dds_tt_identifier_t name, dds_tt_node_t *parent)
 {
   dds_tt_module_t *def = (dds_tt_module_t*)os_malloc(sizeof(dds_tt_module_t));
   if (def == NULL) {
     abort();
   }
-  init_definition((dds_tt_definition_t*)def, name, DDS_TT_MODULE, parent);
+  init_definition(context, (dds_tt_definition_t*)def, name, DDS_TT_MODULE, parent);
   return def;
 }
 
@@ -406,11 +428,10 @@ extern dds_tt_context_t* dds_tt_create_context()
     abort();
   }
   context->ignore_yyerror = false;
-  context->root_node = (dds_tt_node_t*)dds_tt_new_module_definition("", NULL);
+  context->root_node = (dds_tt_node_t*)dds_tt_new_module_definition(context, NULL, NULL);
   context->cur_node = context->root_node;
-  context->ref_next_declarator = NULL;
-  context->ref_next_union_case = NULL;
-  //context->ref_next_union_case_label = NULL;
+  context->parent_for_declarator = NULL;
+  context->cur_union_case = NULL;
   return context;
 }
 
@@ -447,7 +468,14 @@ extern void dds_tt_module_open(dds_tt_context_t *context, dds_tt_identifier_t na
 {
   //fprintf(stderr, "dds_tt_module_open %s\n", name);	
   assert(cur_scope_is_definition_type(context, DDS_TT_MODULE));
-  context->cur_node = (dds_tt_node_t*)dds_tt_new_module_definition(name, (dds_tt_node_t*)context->cur_node);
+  dds_tt_module_t *module = dds_tt_new_module_definition(context, name, (dds_tt_node_t*)context->cur_node);
+  /* Search the previous occurence of this module
+  for (dds_tt_node_t *child = context->cur_node->children; child != NULL; child = child->next) {
+    if (child->flags == DDS_TT_MODULE && strcmp(((dds_tt_definition_t*)child)->name, name) == 0) {
+      / * FIXME: store result in module * /
+    }
+  }*/
+  context->cur_node = (dds_tt_node_t*)module;
   //fprintf(stderr, " cur scope %s\n", context->cur_node->name);
 }
 
@@ -463,8 +491,6 @@ extern void dds_tt_module_close(dds_tt_context_t *context)
 void dds_tt_add_struct_forward(dds_tt_context_t *context, dds_tt_identifier_t name)
 {
   assert(cur_scope_is_definition_type(context, DDS_TT_MODULE));
-  (void)context;
-  (void)name;
   /*
   dds_tt_definition_t *def = context->cur_node->module_def->definitions;
   for (; def != NULL; def = def->next) {
@@ -476,20 +502,19 @@ void dds_tt_add_struct_forward(dds_tt_context_t *context, dds_tt_identifier_t na
       return;
     }
   }
-
-  dds_tt_definition_t *new_struct_forward = dds_tt_new_definition(name, dds_tt_definition_struct_forward, context->cur_node);
-  new_struct_forward->struct_forward_def = (dds_tt_struct_forward_t*)os_malloc(sizeof(dds_tt_struct_forward_t));
-  if (new_struct_forward->struct_forward_def == NULL) {
+  */
+  dds_tt_forward_declaration_t *forward_dcl = (dds_tt_forward_declaration_t*)os_malloc(sizeof(dds_tt_forward_declaration_t));
+  if (forward_dcl == NULL) {
     abort();
   }
-  new_struct_forward->struct_forward_def->defined = false;
-  */
+  init_definition(context, (dds_tt_definition_t*)forward_dcl, name, DDS_TT_FORWARD_STRUCT, context->cur_node);
+  forward_dcl->definition = NULL;
 }
 
 void dds_tt_add_struct_open(dds_tt_context_t *context, dds_tt_identifier_t name)
 {
-  (void)context;
-  (void)name;
+  assert(   cur_scope_is_definition_type(context, DDS_TT_MODULE)
+         || cur_scope_is_definition_type(context, DDS_TT_STRUCT));
 /*
   assert(cur_scope_is_definition_type(context, dds_tt_definition_module));
   dds_tt_definition_t *def = context->cur_node->module_def->definitions;
@@ -500,16 +525,14 @@ void dds_tt_add_struct_open(dds_tt_context_t *context, dds_tt_identifier_t name)
       / * FIXME: report error: repeated definition * /
     }
   }
-
-  dds_tt_definition_t *new_struct = dds_tt_new_definition(name, dds_tt_definition_struct, context->cur_node);
-  dds_tt_append_definition(new_struct, &context->cur_node->module_def->definitions);
-  new_struct->struct_def = (dds_tt_struct_t*)os_malloc(sizeof(dds_tt_struct_t));
-  if (new_struct->struct_def == NULL) {
+*/
+  dds_tt_struct_t *new_struct = (dds_tt_struct_t*)os_malloc(sizeof(dds_tt_struct_t));
+  if (new_struct == NULL) {
     abort();
   }
-  new_struct->struct_def->members = NULL;
-  context->cur_node = new_struct;
-*/
+  init_definition(context, (dds_tt_definition_t*)new_struct, name, DDS_TT_STRUCT, context->cur_node);
+  new_struct->super = NULL;
+  context->cur_node = (dds_tt_node_t*)new_struct;
 }
 
 void dds_tt_add_struct_extension_open(dds_tt_context_t *context, dds_tt_identifier_t name, dds_tt_scoped_name_t *scoped_name)
@@ -522,40 +545,28 @@ void dds_tt_add_struct_extension_open(dds_tt_context_t *context, dds_tt_identifi
 
 void dds_tt_add_struct_member(dds_tt_context_t *context, dds_tt_type_spec_t *type)
 {
-  (void)context;
-  (void)type;
-/*
-  assert(cur_scope_is_definition_type(context, dds_tt_definition_struct));
-  context->ref_next_declarator = NULL;
-  dds_tt_struct_member_t **ref_member = &context->cur_node->struct_def->members;
-  while ((*ref_member) != NULL) {
-    ref_member = &(*ref_member)->next;
-  }
-  (*ref_member) = (dds_tt_struct_member_t*)os_malloc(sizeof(dds_tt_struct_member_t));
-  if ((*ref_member) == NULL) {
+  assert(cur_scope_is_definition_type(context, DDS_TT_STRUCT));
+  dds_tt_struct_member_t *member = (dds_tt_struct_member_t*)os_malloc(sizeof(dds_tt_struct_member_t));
+  if (member == NULL) {
     abort();
   }
-  (*ref_member)->type = type;
-  (*ref_member)->declarators = NULL;
-  (*ref_member)->next = NULL;
-  context->ref_next_declarator = &(*ref_member)->declarators;
-*/
+  init_annotated_node(context, (dds_tt_annotated_node_t*)member, DDS_TT_STRUCT_MEMBER, context->cur_node);
+  member->member_type = type;
+  context->parent_for_declarator = (dds_tt_node_t*)member;
 }
 
 void dds_tt_struct_close(dds_tt_context_t *context)
 {
-  (void)context;
-/*
-  assert(cur_scope_is_definition_type(context, dds_tt_definition_struct));
-  context->ref_next_declarator = NULL;
+  assert(cur_scope_is_definition_type(context, DDS_TT_STRUCT));
   context->cur_node = context->cur_node->parent;
-*/
+  context->parent_for_declarator = NULL;
 }
 
 void dds_tt_struct_empty_close(dds_tt_context_t *context)
 {
-  assert(context != NULL);
-  (void)context;
+  assert(cur_scope_is_definition_type(context, DDS_TT_STRUCT));
+  context->cur_node = context->cur_node->parent;
+  context->parent_for_declarator = NULL;
 }
 
 void dds_tt_add_union_forward(dds_tt_context_t *context, dds_tt_identifier_t name)
@@ -574,22 +585,19 @@ void dds_tt_add_union_forward(dds_tt_context_t *context, dds_tt_identifier_t nam
       return;
     }
   }
-
-  dds_tt_definition_t *new_union_forward = dds_tt_new_definition(name, dds_tt_definition_union_forward, context->cur_node);
-  new_union_forward->union_forward_def = (dds_tt_union_forward_t*)os_malloc(sizeof(dds_tt_union_forward_t));
-  if (new_union_forward->union_forward_def == NULL) {
+  */
+  dds_tt_forward_declaration_t *forward_dcl = (dds_tt_forward_declaration_t*)os_malloc(sizeof(dds_tt_forward_declaration_t));
+  if (forward_dcl == NULL) {
     abort();
   }
-  new_union_forward->union_forward_def->defined = false;
-*/
+  init_definition(context, (dds_tt_definition_t*)forward_dcl, name, DDS_TT_FORWARD_UNION, context->cur_node);
+  forward_dcl->definition = NULL;
 }
 
-void dds_tt_add_union_open(dds_tt_context_t *context, dds_tt_identifier_t name, dds_tt_node_flags_t base_type)
+void dds_tt_add_union_open(dds_tt_context_t *context, dds_tt_identifier_t name, dds_tt_node_flags_t switch_type)
 {
   //fprintf(stderr, "union_open\n");
-  (void)context;
-  (void)name;
-  (void)base_type;
+  assert(cur_scope_is_definition_type(context, DDS_TT_MODULE));
 /*
   assert(cur_scope_is_definition_type(context, dds_tt_definition_module));
   dds_tt_definition_t *def = context->cur_node->module_def->definitions;
@@ -600,60 +608,36 @@ void dds_tt_add_union_open(dds_tt_context_t *context, dds_tt_identifier_t name, 
       / * FIXME: report error: repeated definition * /
     }
   }
-
-  dds_tt_definition_t *new_union = dds_tt_new_definition(name, dds_tt_definition_union, context->cur_node);
-  dds_tt_append_definition(new_union, &context->cur_node->module_def->definitions);
-  new_union->union_def = (dds_tt_union_t*)os_malloc(sizeof(dds_tt_union_t));
-  if (new_union->union_def == NULL) {
+*/
+  dds_tt_union_t *new_union = (dds_tt_union_t*)os_malloc(sizeof(dds_tt_union_t));
+  if (new_union == NULL) {
     abort();
   }
-  new_union->union_def->switch_type = base_type;
-  new_union->union_def->cases = NULL;
-  context->cur_node = new_union;
-  context->ref_next_union_case = &new_union->union_def->cases;
-  context->ref_next_union_case_label = NULL;
-*/
+  init_definition(context, (dds_tt_definition_t*)new_union, name, DDS_TT_UNION, context->cur_node);
+  new_union->switch_type = switch_type;
+  context->cur_node = (dds_tt_node_t*)new_union;
 }
 
-/*
-static dds_tt_union_case_label_t *dds_tt_new_union_case_label(dds_tt_context_t *context)
+static void init_union_case(dds_tt_context_t *context)
 {
   (void)context;
   assert(context != NULL);
-  assert(context->ref_next_union_case != NULL);
-  if ((*context->ref_next_union_case) == NULL) {
-    // First label of case: create the case
-    context->ref_next_declarator = NULL;
-    (*context->ref_next_union_case) = (dds_tt_union_case_t*)os_malloc(sizeof(dds_tt_union_case_t));
-    if ((*context->ref_next_union_case) == NULL) {
+  if (context->cur_union_case == NULL) {
+    dds_tt_union_case_t *union_case = (dds_tt_union_case_t*)os_malloc(sizeof(dds_tt_union_case_t));
+    if (union_case == NULL) {
       abort();
     }
-    (*context->ref_next_union_case)->labels = NULL;
-    (*context->ref_next_union_case)->element_type = NULL;
-    (*context->ref_next_union_case)->declarators = NULL;
-    (*context->ref_next_union_case)->next = NULL;
-    context->ref_next_union_case_label = &(*context->ref_next_union_case)->labels;
+    init_definition(context, (dds_tt_definition_t*)union_case, NULL, DDS_TT_UNION_CASE, context->cur_node);
+    union_case->branch_type = 0;
+    context->cur_union_case = union_case; 
   }
-  assert(context->ref_next_union_case_label != NULL);
-  dds_tt_union_case_label_t *case_label = (dds_tt_union_case_label_t*)os_malloc(sizeof(dds_tt_union_case_label_t));
-  if (case_label == NULL) {
-    abort();
-  }
-  case_label->is_default = false;
-  case_label->next = NULL;
-  (*context->ref_next_union_case_label) = case_label;
-  context->ref_next_union_case_label = &case_label->next;
-  return case_label;
 }
-*/
 
-void dds_tt_add_union_case_label(dds_tt_context_t *context, dds_tt_value_t value)
+void dds_tt_add_union_case_label(dds_tt_context_t *context, dds_tt_literal_t value)
 {
   //fprintf(stderr, "union_case_label\n");
-  (void)context;
-  (void)value;
+  assert(cur_scope_is_definition_type(context, DDS_TT_UNION));
 /*
-  assert(cur_scope_is_definition_type(context, dds_tt_definition_union));
   // Check if value matches switch type
   if (dds_tt_check_literal_type(value, context->cur_node->union_def->switch_type)) {
     / * FIXME: report error: type of value does not match * /
@@ -666,17 +650,21 @@ void dds_tt_add_union_case_label(dds_tt_context_t *context, dds_tt_value_t value
       }
     }
   }
-  dds_tt_union_case_label_t * case_label = dds_tt_new_union_case_label(context);
-  case_label->value = value;
 */
+  init_union_case(context);
+  dds_tt_union_case_label_t *label = (dds_tt_union_case_label_t*)os_malloc(sizeof(dds_tt_union_case_label_t));
+  if (label == NULL) {
+    abort();
+  }
+  init_annotated_node(context, (dds_tt_annotated_node_t*)label, DDS_TT_UNION_CASE_LABEL, (dds_tt_node_t*)context->cur_union_case);
+  label->value = value;
 }
 
 void dds_tt_add_union_case_default(dds_tt_context_t *context)
 {
   //fprintf(stderr, "union_case_default\n");
-  (void)context;
+  assert(cur_scope_is_definition_type(context, DDS_TT_UNION));
 /*
-  assert(cur_scope_is_definition_type(context, dds_tt_definition_union));
   // Check if default is repeated
   for (dds_tt_union_case_t *union_case = context->cur_node->union_def->cases; union_case != 0; union_case = union_case->next) {
     for (dds_tt_union_case_label_t *label = union_case->labels; label != 0; label = label->next) {
@@ -685,36 +673,34 @@ void dds_tt_add_union_case_default(dds_tt_context_t *context)
       }
     }
   }
-  dds_tt_union_case_label_t *case_label = dds_tt_new_union_case_label(context);
-  case_label->is_default = true;
 */
+  init_union_case(context);
+  dds_tt_annotated_node_t *default_label = (dds_tt_annotated_node_t*)os_malloc(sizeof(dds_tt_annotated_node_t));
+  if (default_label == NULL) {
+    abort();
+  }
+  init_annotated_node(context, default_label, DDS_TT_UNION_CASE_DEFAULT, (dds_tt_node_t*)context->cur_union_case);
 }
 
 void dds_tt_add_union_element(dds_tt_context_t *context, dds_tt_type_spec_t *type)
 {
   //fprintf(stderr, "union_element\n");
-  (void)context;
-  (void)type;
-/*
-  assert(cur_scope_is_definition_type(context, dds_tt_definition_union));
-  assert(context->ref_next_union_case != NULL);
-  (*context->ref_next_union_case)->element_type = type;
-  context->ref_next_declarator = &(*context->ref_next_union_case)->declarators;
-  context->ref_next_union_case = &(*context->ref_next_union_case)->next;
-  context->ref_next_union_case_label = NULL;
-*/
+  assert(cur_scope_is_definition_type(context, DDS_TT_UNION));
+  assert(context->cur_union_case != NULL);
+  context->cur_union_case->branch_type = type;
+  context->cur_union_case = NULL;
 }
 
 void dds_tt_union_close(dds_tt_context_t *context)
 {
   //fprintf(stderr, "union_close\n");
-  (void)context;
+  assert(cur_scope_is_definition_type(context, DDS_TT_UNION));
 /*
   assert(cur_scope_is_definition_type(context, dds_tt_definition_union));
   context->ref_next_union_case = NULL;
   context->ref_next_union_case_label = NULL;
-  context->cur_node = context->cur_node->parent;
 */
+  context->cur_node = context->cur_node->parent;
 }
 
 void dds_tt_add_typedef_open(dds_tt_context_t *context)
@@ -738,24 +724,23 @@ void dds_tt_typedef_close(dds_tt_context_t *context)
 
 void dds_tt_add_declarator(dds_tt_context_t *context, dds_tt_identifier_t name)
 {
-  //fprintf(stderr, "declarator %s\n", name);
-  (void)context;
-  (void)name;
-/*
   assert(context != NULL);
-  if (context->ref_next_declarator == NULL) {
-    / *FIXME: change into assert when done * /
+  if (context->parent_for_declarator != NULL && context->cur_node->flags == DDS_TT_STRUCT) {
+    dds_tt_definition_t* declarator = (dds_tt_definition_t*)os_malloc(sizeof(dds_tt_definition_t));
+    if (declarator == NULL) {
+      abort();
+    }
+    init_definition(context, declarator, name, DDS_TT_DECLARATOR, context->parent_for_declarator);
     return;
   }
-  (*context->ref_next_declarator) = dds_tt_new_definition(name, dds_tt_definition_declarator, context->cur_node);
-  if ((*context->ref_next_declarator) == NULL) {
-    abort();
+  if (context->cur_union_case != NULL && context->cur_node->flags == DDS_TT_UNION) {
+    context->cur_union_case->name = os_strdup(name);
+    return;
   }
-  context->ref_next_declarator = &(*context->ref_next_declarator)->next;
-*/
+  assert(false);
 }
 
-void dds_tt_add_const_def(dds_tt_context_t *context, dds_tt_type_spec_t *base_type, dds_tt_identifier_t name, dds_tt_value_t value)
+void dds_tt_add_const_def(dds_tt_context_t *context, dds_tt_type_spec_t *base_type, dds_tt_identifier_t name, dds_tt_literal_t value)
 {
   assert(context != NULL);
   (void)context;
@@ -766,57 +751,31 @@ void dds_tt_add_const_def(dds_tt_context_t *context, dds_tt_type_spec_t *base_ty
 
 void dds_tt_add_enum_open(dds_tt_context_t *context, dds_tt_identifier_t name)
 {
-  (void)context;
-  (void)name;
-/*
-  assert(cur_scope_is_definition_type(context, dds_tt_definition_module));
-  dds_tt_definition_t *def = dds_tt_new_definition(name, dds_tt_definition_enum, context->cur_node);
-  dds_tt_append_definition(def, &context->cur_node->module_def->definitions);
-  def->enum_def = (dds_tt_enum_definition_t*)os_malloc(sizeof(dds_tt_enum_definition_t));
-  if (def->enum_def == NULL) {
+  assert(cur_scope_is_definition_type(context, DDS_TT_MODULE));
+  dds_tt_definition_t *enum_def = (dds_tt_definition_t*)os_malloc(sizeof(dds_tt_definition_t));
+  if (enum_def == NULL) {
     abort();
   }
-  def->enum_def->values = NULL;
-  def->enum_def->nr_values = 0;
-  context->cur_node = def;
-*/
+  init_definition(context, enum_def, name, DDS_TT_ENUM, context->cur_node);
+  context->cur_node = (dds_tt_node_t*)enum_def;
 }
 
 void dds_tt_add_enum_enumerator(dds_tt_context_t *context, dds_tt_identifier_t name)
 {
-  (void)context;
-  (void)name;
-/*
   //fprintf(stderr, "add_enum_value %s\n", name);
-  assert(cur_scope_is_definition_type(context, dds_tt_definition_enum));
-  assert(context->cur_node->parent != NULL && context->cur_node->parent->type == dds_tt_definition_module);
-  dds_tt_definition_t *def = dds_tt_new_definition(name, dds_tt_definition_enum_value, context->cur_node);
-  dds_tt_append_definition(def, &context->cur_node->parent->module_def->definitions);
-  def->enum_value_def = (dds_tt_enum_value_definition_t*)os_malloc(sizeof(dds_tt_enum_value_definition_t));
-  if (def->enum_value_def == NULL) {
+  assert(cur_scope_is_definition_type(context, DDS_TT_ENUM));
+  dds_tt_definition_t *enumerator = (dds_tt_definition_t*)os_malloc(sizeof(dds_tt_definition_t));
+  if (enumerator == NULL) {
     abort();
   }
-  def->enum_value_def->def = def;
-  def->enum_value_def->enum_def = context->cur_node->enum_def;
-  def->enum_value_def->next = NULL;
-  def->enum_value_def->nr = context->cur_node->enum_def->nr_values++;
-
-  dds_tt_enum_value_definition_t **ref_value = &context->cur_node->enum_def->values;
-  while ((*ref_value) != NULL) {
-    ref_value = &(*ref_value)->next;
-  }
-  (*ref_value) = def->enum_value_def;
+  init_definition(context, enumerator, name, DDS_TT_ENUMERATOR, context->cur_node);
   //fprintf(stderr, " added to %s\n", context->cur_node->name);
-*/
 }
 
 void dds_tt_enum_close(dds_tt_context_t *context)
 {
-  (void)context;
-/*
-  assert(cur_scope_is_definition_type(context, dds_tt_definition_enum));
+  assert(cur_scope_is_definition_type(context, DDS_TT_ENUM));
   context->cur_node = context->cur_node->parent;
-*/
 }
 
 void dds_tt_add_array_open(dds_tt_context_t *context, dds_tt_identifier_t  name)
@@ -826,7 +785,7 @@ void dds_tt_add_array_open(dds_tt_context_t *context, dds_tt_identifier_t  name)
   (void)name;
 }
 
-void dds_tt_add_array_size(dds_tt_context_t *context, dds_tt_value_t value)
+void dds_tt_add_array_size(dds_tt_context_t *context, dds_tt_literal_t value)
 {
   assert(context != NULL);
   (void)context;
@@ -861,7 +820,7 @@ void dds_tt_add_annotation_member_open(dds_tt_context_t *context, dds_tt_type_sp
   (void)name;
 }
 
-void dds_tt_annotation_member_set_default(dds_tt_context_t *context, dds_tt_value_t value)
+void dds_tt_annotation_member_set_default(dds_tt_context_t *context, dds_tt_literal_t value)
 {
   assert(context != NULL);
   (void)context;
@@ -887,14 +846,14 @@ void dds_tt_add_annotation_appl_open(dds_tt_context_t *context, dds_tt_scoped_na
   (void)scoped_name;
 }
 
-void dds_tt_add_annotation_appl_expr(dds_tt_context_t *context, dds_tt_value_t value)
+void dds_tt_add_annotation_appl_expr(dds_tt_context_t *context, dds_tt_literal_t value)
 {
   assert(context != NULL);
   (void)context;
   (void)value;
 }
 
-void dds_tt_add_annotation_appl_param(dds_tt_context_t *context, dds_tt_identifier_t name, dds_tt_value_t value)
+void dds_tt_add_annotation_appl_param(dds_tt_context_t *context, dds_tt_identifier_t name, dds_tt_literal_t value)
 {
   assert(context != NULL);
   (void)context;
@@ -908,7 +867,7 @@ void dds_tt_annotation_appl_close(dds_tt_context_t *context)
   (void)context;
 }
 
-extern void dds_tt_add_const_definition(dds_tt_context_t *context, dds_tt_identifier_t name, dds_tt_value_t value)
+extern void dds_tt_add_const_definition(dds_tt_context_t *context, dds_tt_identifier_t name, dds_tt_literal_t value)
 {
   (void)context;
   (void)name;
@@ -953,14 +912,14 @@ void dds_tt_add_bitset_open(dds_tt_context_t *context, dds_tt_identifier_t name,
   (void)opt_type;
 }
 
-void dds_tt_add_bitset_field(dds_tt_context_t *context, dds_tt_value_t index)
+void dds_tt_add_bitset_field(dds_tt_context_t *context, dds_tt_literal_t index)
 {
   assert(context != NULL);
   (void)context;
   (void)index;
 }
 
-void dds_tt_add_bitset_field_to(dds_tt_context_t *context, dds_tt_value_t index, dds_tt_node_flags_t dest_type)
+void dds_tt_add_bitset_field_to(dds_tt_context_t *context, dds_tt_literal_t index, dds_tt_node_flags_t dest_type)
 {
   assert(context != NULL);
   (void)context;

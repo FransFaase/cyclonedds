@@ -27,6 +27,7 @@ void dds_tt_walker_for_all_enum_value(dds_tt_walker_t *walker);
 void dds_tt_walker_else(dds_tt_walker_t *walker);
 void dds_tt_walker_end_if(dds_tt_walker_t *walker);
 void dds_tt_walker_end_for(dds_tt_walker_t *walker);
+void dds_tt_walker_emit_type(dds_tt_walker_t *walker);
 void dds_tt_walker_emit_name(dds_tt_walker_t *walker);
 void dds_tt_walker_emit(dds_tt_walker_t *walker, const char *text);
 void dds_tt_walker_end_def(dds_tt_walker_t *walker);

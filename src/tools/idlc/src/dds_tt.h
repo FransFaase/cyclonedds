@@ -19,57 +19,65 @@
 //#define DDS_TT_LITERAL (1<<5)
 //flags = DDS_TT_LITERAL | DDS_TT_ULLONG;
 
-#define DDS_TT_CATEGORY(C)              ((C)<<6)
-#define DDS_TT_IS_CATEGORY(X,C)         (((15<<6)&(X))==DDS_TT_CATEGORY(C))
-#define DDS_TT_BASIC_TYPE(X)            (DDS_TT_CATEGORY(1) | (X))
-#define DDS_TT_SHORT_TYPE               DDS_TT_BASIC_TYPE(1)
-#define DDS_TT_LONG_TYPE                DDS_TT_BASIC_TYPE(2)
-#define DDS_TT_LONG_LONG_TYPE           DDS_TT_BASIC_TYPE(3)
-#define DDS_TT_UNSIGNED_SHORT_TYPE      DDS_TT_BASIC_TYPE(4)
-#define DDS_TT_UNSIGNED_LONG_TYPE       DDS_TT_BASIC_TYPE(5)
-#define DDS_TT_UNSIGNED_LONG_LONG_TYPE  DDS_TT_BASIC_TYPE(6)
-#define DDS_TT_CHAR_TYPE                DDS_TT_BASIC_TYPE(7)
-#define DDS_TT_WIDE_CHAR_TYPE           DDS_TT_BASIC_TYPE(8)
-#define DDS_TT_BOOLEAN_TYPE             DDS_TT_BASIC_TYPE(9)
-#define DDS_TT_OCTET_TYPE               DDS_TT_BASIC_TYPE(10)
-#define DDS_TT_INT8_TYPE                DDS_TT_BASIC_TYPE(11)
-#define DDS_TT_UINT8_TYPE               DDS_TT_BASIC_TYPE(12)
-#define DDS_TT_FLOAT_TYPE               DDS_TT_BASIC_TYPE(13)
-#define DDS_TT_DOUBLE_TYPE              DDS_TT_BASIC_TYPE(14)
-#define DDS_TT_LONG_DOUBLE_TYPE         DDS_TT_BASIC_TYPE(15)
-#define DDS_TT_FIXED_PT_CONST_TYPE      DDS_TT_BASIC_TYPE(16)
-#define DDS_TT_ANY_TYPE                 DDS_TT_BASIC_TYPE(17)
-#define DDS_TT_TYPE_SPEC(X)             (DDS_TT_CATEGORY(2) | (X))
-#define DDS_TT_SEQUENCE_TYPE            DDS_TT_TYPE_SPEC(1)
-#define DDS_TT_STRING_TYPE              DDS_TT_TYPE_SPEC(2)
-#define DDS_TT_WIDE_STRING_TYPE         DDS_TT_TYPE_SPEC(3)
-#define DDS_TT_FIXED_PT_TYPE            DDS_TT_TYPE_SPEC(4)
-#define DDS_TT_MAP_TYPE                 DDS_TT_TYPE_SPEC(5)
-#define DDS_TT_DEFINITION(X)            (DDS_TT_CATEGORY(3) | (X))
-#define DDS_TT_IS_DEFINITION(X)         DDS_TT_IS_CATEGORY(X,3)
+// The bits used for the flags are:
+// 0-7: the specific base type
+// 8-13: the type spec
+// 14-15: the definitions
+// 16-: the other nodes
+
+#define DDS_TT_TYPE_SPEC(X)             (((X)&7)<<8)
+#define DDS_TT_IS_TYPE_SPEC(T)          (((7<<8)&(T)) != 0)
+#define DDS_TT_BASE_TYPE(X)             (DDS_TT_TYPE_SPEC(1) | (X))
+#define DDS_TT_IS_BASE_TYPE(T)          (((7<<8)&(T)) == 1)
+#define DDS_TT_GET_BASE_TYPE(T)         (((7<<8)|31)&(T))
+#define DDS_TT_SHORT_TYPE               DDS_TT_BASE_TYPE(1)
+#define DDS_TT_LONG_TYPE                DDS_TT_BASE_TYPE(2)
+#define DDS_TT_LONG_LONG_TYPE           DDS_TT_BASE_TYPE(3)
+#define DDS_TT_UNSIGNED_SHORT_TYPE      DDS_TT_BASE_TYPE(4)
+#define DDS_TT_UNSIGNED_LONG_TYPE       DDS_TT_BASE_TYPE(5)
+#define DDS_TT_UNSIGNED_LONG_LONG_TYPE  DDS_TT_BASE_TYPE(6)
+#define DDS_TT_CHAR_TYPE                DDS_TT_BASE_TYPE(7)
+#define DDS_TT_WIDE_CHAR_TYPE           DDS_TT_BASE_TYPE(8)
+#define DDS_TT_BOOLEAN_TYPE             DDS_TT_BASE_TYPE(9)
+#define DDS_TT_OCTET_TYPE               DDS_TT_BASE_TYPE(10)
+#define DDS_TT_INT8_TYPE                DDS_TT_BASE_TYPE(11)
+#define DDS_TT_UINT8_TYPE               DDS_TT_BASE_TYPE(12)
+#define DDS_TT_FLOAT_TYPE               DDS_TT_BASE_TYPE(13)
+#define DDS_TT_DOUBLE_TYPE              DDS_TT_BASE_TYPE(14)
+#define DDS_TT_LONG_DOUBLE_TYPE         DDS_TT_BASE_TYPE(15)
+#define DDS_TT_FIXED_PT_CONST_TYPE      DDS_TT_BASE_TYPE(16)
+#define DDS_TT_ANY_TYPE                 DDS_TT_BASE_TYPE(17)
+#define DDS_TT_SEQUENCE_TYPE            DDS_TT_TYPE_SPEC(2)
+#define DDS_TT_STRING_TYPE              DDS_TT_TYPE_SPEC(3)
+#define DDS_TT_WIDE_STRING_TYPE         DDS_TT_TYPE_SPEC(4)
+#define DDS_TT_FIXED_PT_TYPE            DDS_TT_TYPE_SPEC(5)
+#define DDS_TT_MAP_TYPE                 DDS_TT_TYPE_SPEC(6)
+#define DDS_TT_DEFINITION(X)            (((X)&15)<<12)
+#define DDS_TT_IS_DEFINITION(T)         (((15<<12)&(T)) != 0)
 #define DDS_TT_MODULE                   DDS_TT_DEFINITION(1)
 #define DDS_TT_FORWARD_STRUCT           DDS_TT_DEFINITION(2)
 #define DDS_TT_FORWARD_UNION            DDS_TT_DEFINITION(3)
 #define DDS_TT_STRUCT                   DDS_TT_DEFINITION(4)
-#define DDS_TT_UNION                    DDS_TT_DEFINITION(4)
-#define DDS_TT_ENUM                     DDS_TT_DEFINITION(6)
+#define DDS_TT_UNION                    DDS_TT_DEFINITION(5)
+#define DDS_TT_UNION_CASE               DDS_TT_DEFINITION(6)
+#define DDS_TT_DECLARATOR               DDS_TT_DEFINITION(7)
+#define DDS_TT_ENUM                     DDS_TT_DEFINITION(8)
+#define DDS_TT_ENUMERATOR               DDS_TT_DEFINITION(9)
 #define DDS_TT_CONST_DEF                DDS_TT_DEFINITION(10)
 #define DDS_TT_BITSET                   DDS_TT_DEFINITION(11)
 #define DDS_TT_BITMASK                  DDS_TT_DEFINITION(12)
 #define DDS_TT_NATIVE                   DDS_TT_DEFINITION(13)
 #define DDS_TT_TYPE_DEF                 DDS_TT_DEFINITION(14)
 #define DDS_TT_ANNOTATION_DEF           DDS_TT_DEFINITION(15)
-#define DDS_TT_PART(X)                  (DDS_TT_CATEGORY(4) | (X))
-#define DDS_TT_ANNOTATION_PARM          DDS_TT_PART(1)
-#define DDS_TT_STRUCT_MEMBER            DDS_TT_PART(2)
-#define DDS_TT_ARRAY_SIZE               DDS_TT_PART(3)
-#define DDS_TT_UNION_CASE               DDS_TT_PART(4)
-#define DDS_TT_UNION_CASE_LABEL         DDS_TT_PART(5)
-#define DDS_TT_UNION_CASE_DEFAULT       DDS_TT_PART(6)
-#define DDS_TT_ENUM_VALUE               DDS_TT_PART(7)
-#define DDS_TT_BIT_FIELD                DDS_TT_PART(8)
-#define DDS_TT_BIT_VALUE                DDS_TT_PART(9)
-#define DDS_PRAGMA                      DDS_TT_CATEGORY(5)
+#define DDS_TT_OTHER(X)                 ((X)<<16)
+#define DDS_TT_ANNOTATION_PARM          DDS_TT_OTHER(1)
+#define DDS_TT_STRUCT_MEMBER            DDS_TT_OTHER(2)
+#define DDS_TT_ARRAY_SIZE               DDS_TT_OTHER(3)
+#define DDS_TT_UNION_CASE_LABEL         DDS_TT_OTHER(4)
+#define DDS_TT_UNION_CASE_DEFAULT       DDS_TT_OTHER(5)
+#define DDS_TT_BIT_FIELD                DDS_TT_OTHER(6)
+#define DDS_TT_BIT_VALUE                DDS_TT_OTHER(7)
+#define DDS_PRAGMA                      DDS_TT_OTHER(8)
 
 // Open issues:
 // - How to represent array sizes (as tree elements or as an array of 
@@ -80,15 +88,36 @@
 
 typedef char *dds_tt_identifier_t;
 
+// Literals
+
+// Literals are values, either stated or calculated with an expression, that
+// appear in the IDL declaration. The literals only appear as members of
+// IDL elements, such as the constant definition and the case labels.
+
+typedef uint32_t dds_tt_node_flags_t;
+
+typedef struct {
+  dds_tt_node_flags_t flags; // flags defining the kind of the literal
+  union {
+    bool bln;
+    char chr;
+    unsigned long wchr;
+    char *str;
+    unsigned long long ullng;
+    signed long long llng;
+    long double ldbl;
+  };
+} dds_tt_literal_t;
+
+
 // Generic node
 
 // The generic node serves as a basis for all other elements of the IDL type
 // definitions
 
 typedef struct dds_tt_node dds_tt_node_t;
-typedef uint32_t dds_tt_node_flags_t;
 struct dds_tt_node {
-  dds_tt_node_flags_t flags;            // flags defining the kind of the node
+  dds_tt_node_flags_t flags; // flags defining the kind of the node
   dds_tt_node_t *parent;     // pointer to the parent node
   dds_tt_node_t *children;   // pointer to the first child
   dds_tt_node_t *next;       // pointer to the next sibling
@@ -96,53 +125,6 @@ struct dds_tt_node {
   // been parsed from. This is maybe needed to determine for which parts
   // of the preprocessed output code needs to be generated.
 };
-
-
-// Literals
-
-// Literals are values, either stated or calculated with an expression, that
-// appear in the IDL declaration
-
-// Literals (literal)
-typedef struct {
-  dds_tt_node_t;
-} dds_tt_literal_t;
-
-// Integer literal (integer_literal)
-typedef struct {
-  dds_tt_literal_t;
-  long long value;
-} dds_tt_integer_literal_t;
-
-// Floating point literal (floating_pt_literal)
-typedef struct {
-  dds_tt_literal_t;
-  long double value;
-} dds_tt_floating_point_literal_t;
-
-// Character literal (character_literal)
-typedef struct {
-  dds_tt_literal_t;
-  char value;
-} dds_tt_char_literal_t;
-
-// Wide character literal (character_literal)
-typedef struct {
-  dds_tt_literal_t;
-  unsigned long value;
-} dds_tt_wide_char_literal_t;
-
-// Boolean literal (boolean_literal)
-typedef struct {
-  dds_tt_literal_t;
-  bool value;
-} dds_tt_boolean_literal_t;
-
-// (Wide) String literal (string_literal, wide_string_literal)
-typedef struct {
-  dds_tt_literal_t;
-  char *value;
-} dds_tt_string_literal_t;
 
 
 // Annotations
@@ -156,7 +138,8 @@ typedef struct dds_tt_annotation_definition dds_tt_annotation_definition_t;
 // - parameters appear as children
 typedef struct {
   dds_tt_node_t;
-  dds_tt_annotation_definition_t *definition;
+  const char* name;
+  dds_tt_annotation_definition_t *definition; // NULL for build-in annotations
 } dds_tt_annotation_appl_t;
 
 // Annotation parameter (annotation_appl_param)
@@ -179,7 +162,7 @@ typedef struct {
   dds_tt_annotated_node_t;
 } dds_tt_type_spec_t;
 
-// Basic type specification (base_type_spec)
+// Base type specification (base_type_spec)
 typedef struct {
   dds_tt_type_spec_t;
 } dds_tt_base_type_t;
@@ -187,7 +170,7 @@ typedef struct {
 // Sequence type (sequence_type)
 typedef struct {
   dds_tt_type_spec_t;
-  dds_tt_type_spec_t* base;
+  dds_tt_type_spec_t* element_type;
   bool bounded;
   unsigned long long max;
 } dds_tt_sequence_type_t;
@@ -203,7 +186,7 @@ typedef struct {
 typedef struct {
   dds_tt_type_spec_t;
   unsigned long long digits;
-  unsigned long long fractional_digits;
+  unsigned long long fraction_digits;
 } dds_tt_fixed_pt_type_t;
 
 // Map type (map_type)
@@ -211,6 +194,7 @@ typedef struct {
   dds_tt_type_spec_t;
   dds_tt_type_spec_t *key_type;
   dds_tt_type_spec_t *value_type;
+  bool bounded;
   unsigned long long max;
 } dds_tt_map_type_t;
 
@@ -242,7 +226,7 @@ typedef struct {
 // Forward declaration
 typedef struct {
   dds_tt_definition_t;
-  dds_tt_definition_t *definition;
+  dds_tt_definition_t *definition; // reference to the actual definition
 } dds_tt_forward_declaration_t;
 
 // Struct forward declaration (struct_forward_dcl)
@@ -280,16 +264,21 @@ typedef struct {
 // - cases appear as children
 typedef struct {
   dds_tt_definition_t;
-  dds_tt_base_type_t *switch_type;
+  dds_tt_node_flags_t switch_type;
 } dds_tt_union_t;
 
-// Union declaration (case)
-// - declarator appears as child
-// - labels are literals (or default case)
+// Union cases (case)
+// - labels (including default) appear as children
+typedef struct {
+  dds_tt_definition_t; // name of definition is the branch name
+  dds_tt_type_spec_t *branch_type;
+} dds_tt_union_case_t;
+
+// Union case labels (case_label)
 typedef struct {
   dds_tt_annotated_node_t;
-  dds_tt_node_t *labels;
-} dds_tt_union_case_t;
+  dds_tt_literal_t value;
+} dds_tt_union_case_label_t;
 
 // Enumeration
 

@@ -43,8 +43,8 @@
 
 %x MULTILINE_COMMENT
 %x COMMENT
-%x STRING
-%x WSTRING
+%x INSTRING
+%x INWSTRING
 
 %option noyywrap
 %option nounistd
@@ -96,6 +96,20 @@ wchar                     { return(WCHAR); }
 boolean                   { return(BOOLEAN); }
 octet                     { return(OCTET); }
 any                       { return(ANY); }
+int8                      { return(INT8); }
+uint8                     { return(UINT8); }
+int16                     { return(INT16); }
+uint16                    { return(UINT16); }
+int32                     { return(INT32); }
+uint32                    { return(UINT32); }
+int64                     { return(INT64); }
+uint64                    { return(UINT64); }
+sequence                  { return(SEQUENCE); }
+string                    { return(STRING); }
+wstring                   { return(WSTRING); }
+fixed                     { return(FIXED); }
+map                       { return(MAP); }
+
 
 module                    { return(MODULE); }
 struct                    { return(STRUCT); }
@@ -118,10 +132,10 @@ FALSE                     {
 {integer_literal}         {
                             errno = 0;
                             /* strtoll recognizes if the value is dec, oct or hex if base is zero */
-                            yylval->literal.type = dds_tt_value_integer;
-                            yylval->literal.value.llng = strtoll(yytext, NULL, 0); /* FIXME: use strtoll_l */
-                            if (errno == ERANGE && (yylval->literal.value.llng == LLONG_MIN ||
-                                                    yylval->literal.value.llng == LLONG_MAX))
+                            yylval->literal.flags = DDS_TT_LONG_LONG_TYPE;
+                            yylval->literal.llng = strtoll(yytext, NULL, 0); /* FIXME: use strtoll_l */
+                            if (errno == ERANGE && (yylval->literal.llng == LLONG_MIN ||
+                                                    yylval->literal.llng == LLONG_MAX))
                             {
                               perror("Integer value invalid"); /* FIXME: use yyerror */
                             }
@@ -130,10 +144,10 @@ FALSE                     {
 
 {floating_pt_literal}     {
                             errno = 0;
-                            yylval->literal.type = dds_tt_value_floating_pt;
-                            yylval->literal.value.ldbl = strtold(yytext, NULL); /* FIXME: use strtold_l */
-                            if (errno == ERANGE && (yylval->literal.value.ldbl == HUGE_VALL ||
-                                                    yylval->literal.value.ldbl == 0))
+                            yylval->literal.flags = DDS_TT_LONG_DOUBLE_TYPE;
+                            yylval->literal.ldbl = strtold(yytext, NULL); /* FIXME: use strtold_l */
+                            if (errno == ERANGE && (yylval->literal.ldbl == HUGE_VALL ||
+                                                    yylval->literal.ldbl == 0))
                             {
                               perror("Invalid floating_pt_literal"); /* FIXME: use yyerror */
                             }
@@ -142,10 +156,10 @@ FALSE                     {
 
 {fixed_pt_literal}        {
                             errno = 0;
-                            yylval->literal.type = dds_tt_value_fixed_pt;
-                            yylval->literal.value.ldbl = strtold(yytext, NULL); /* FIXME: use strtold_l */
-                            if (errno == ERANGE && (yylval->literal.value.ldbl == HUGE_VALL ||
-                                                    yylval->literal.value.ldbl == 0))
+                            yylval->literal.flags = DDS_TT_FIXED_PT_TYPE;
+                            yylval->literal.ldbl = strtold(yytext, NULL); /* FIXME: use strtold_l */
+                            if (errno == ERANGE && (yylval->literal.ldbl == HUGE_VALL ||
+                                                    yylval->literal.ldbl == 0))
                             {
                               perror("Invalid fixed_pt_literal"); /* FIXME: use yyerror */
                             }
@@ -153,38 +167,38 @@ FALSE                     {
                           }
 
 "'"{char_literal}"'"      {
-                            yylval->literal.type = dds_tt_value_character;
-                            yylval->literal.value.chr = dds_tt_unescape_char(yytext + 1, NULL);
+                            yylval->literal.flags = DDS_TT_CHAR_TYPE;
+                            yylval->literal.chr = dds_tt_unescape_char(yytext + 1, NULL);
                             return CHARACTER_LITERAL;
                           }
 
 "L'"{char_literal}"'"      {
-                            yylval->literal.type = dds_tt_value_wide_character;
-                            yylval->literal.value.wchr = dds_tt_unescape_wchar(yytext + 1, NULL);
+                            yylval->literal.flags = DDS_TT_WIDE_CHAR_TYPE;
+                            yylval->literal.wchr = dds_tt_unescape_wchar(yytext + 1, NULL);
                             return WIDE_CHARACTER_LITERAL;
                           }
 
-"\""                      { BEGIN(STRING); }
-<STRING>{string_literal}  {
-                            yylval->literal.type = dds_tt_value_string;
-                            yylval->literal.value.str = strdup(yytext);
-                            if (yylval->literal.value.str == NULL) {
+"\""                      { BEGIN(INSTRING); }
+<INSTRING>{string_literal}  {
+                            yylval->literal.flags = DDS_TT_STRING_TYPE;
+                            yylval->literal.str = strdup(yytext);
+                            if (yylval->literal.str == NULL) {
                               perror("Could not copy string_literal"); /* FIXME: use yyerror */
                             }
                             return STRING_LITERAL;
                           }
-<STRING>"\""              { BEGIN(INITIAL); }
+<INSTRING>"\""            { BEGIN(INITIAL); }
 
-"L\""                     { BEGIN(WSTRING); }
-<WSTRING>{string_literal} {
-                            yylval->literal.type = dds_tt_value_string;
-                            yylval->literal.value.str = strdup(yytext);
-                            if (yylval->literal.value.str == NULL) {
+"L\""                     { BEGIN(INWSTRING); }
+<INWSTRING>{string_literal} {
+                            yylval->literal.flags = DDS_TT_WIDE_STRING_TYPE;
+                            yylval->literal.str = strdup(yytext);
+                            if (yylval->literal.str == NULL) {
                               perror("Could not copy string_literal"); /* FIXME: use yyerror */
                             }
                             return WIDE_STRING_LITERAL;
                           }
-<WSTRING>"\""             { BEGIN(INITIAL); }
+<INWSTRING>"\""           { BEGIN(INITIAL); }
 
 {identifier}              {
                             yylval->identifier = strdup(yytext);

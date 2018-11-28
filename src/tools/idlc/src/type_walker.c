@@ -41,6 +41,7 @@ typedef enum {
   dds_tt_walker_expr_else,
   dds_tt_walker_expr_end_if,
   dds_tt_walker_expr_end_for,
+  dds_tt_walker_expr_emit_type,
   dds_tt_walker_expr_emit_name,
   dds_tt_walker_expr_emit,
   dds_tt_walker_expr_end_def,
@@ -212,6 +213,13 @@ void dds_tt_walker_end_for(dds_tt_walker_t *walker)
   //fprintf(stderr, "new parent %p\n", walker->cur_parent_expr);
 }
 
+void dds_tt_walker_emit_type(dds_tt_walker_t *walker)
+{
+  //fprintf(stderr, "emit type\n");
+  dds_tt_walker_expr_t *expr = dds_tt_create_expr(dds_tt_walker_expr_emit_type, walker);
+  (void)expr;
+}
+
 void dds_tt_walker_emit_name(dds_tt_walker_t *walker)
 {
   //fprintf(stderr, "emit name\n");
@@ -271,9 +279,104 @@ static void dds_tt_ostream_emit(dds_tt_ostream_t *stream, const char *s)
   *stream->s = '\0';
 }
 
+static void dds_tt_ostream_emit_ull(dds_tt_ostream_t *stream, unsigned long long ull)
+{
+  char buffer[100];
+  sprintf(buffer, "%llu", ull);
+  dds_tt_ostream_emit(stream, buffer);
+}
+
 typedef struct {
   dds_tt_node_t *cur_node;
 } dds_tt_exec_state_t;
+
+void emit_type_spec(dds_tt_type_spec_t *type_spec, dds_tt_ostream_t *stream)
+{
+  switch (type_spec->flags) {
+    case DDS_TT_SHORT_TYPE: dds_tt_ostream_emit(stream, "short"); break;
+    case DDS_TT_LONG_TYPE: dds_tt_ostream_emit(stream, "long"); break;
+    case DDS_TT_LONG_LONG_TYPE: dds_tt_ostream_emit(stream, "long long"); break;
+    case DDS_TT_UNSIGNED_SHORT_TYPE: dds_tt_ostream_emit(stream, "unsigned short"); break;
+    case DDS_TT_UNSIGNED_LONG_TYPE: dds_tt_ostream_emit(stream, "unsigned long"); break;
+    case DDS_TT_UNSIGNED_LONG_LONG_TYPE: dds_tt_ostream_emit(stream, "unsigned long long"); break;
+    case DDS_TT_CHAR_TYPE: dds_tt_ostream_emit(stream, "char"); break;
+    case DDS_TT_WIDE_CHAR_TYPE: dds_tt_ostream_emit(stream, "wchar"); break;
+    case DDS_TT_OCTET_TYPE: dds_tt_ostream_emit(stream, "octet"); break;
+    case DDS_TT_INT8_TYPE: dds_tt_ostream_emit(stream, "int8"); break;
+    case DDS_TT_UINT8_TYPE: dds_tt_ostream_emit(stream, "uint8"); break;
+    case DDS_TT_BOOLEAN_TYPE: dds_tt_ostream_emit(stream, "bool"); break;
+    case DDS_TT_FLOAT_TYPE: dds_tt_ostream_emit(stream, "float"); break;
+    case DDS_TT_DOUBLE_TYPE: dds_tt_ostream_emit(stream, "double"); break;
+    case DDS_TT_LONG_DOUBLE_TYPE: dds_tt_ostream_emit(stream, "long double"); break;
+    case DDS_TT_FIXED_PT_CONST_TYPE: dds_tt_ostream_emit(stream, "fixed"); break;
+    case DDS_TT_ANY_TYPE: dds_tt_ostream_emit(stream, "any"); break;
+    case DDS_TT_SEQUENCE_TYPE: 
+      {
+        dds_tt_ostream_emit(stream, "sequence<"); 
+        dds_tt_sequence_type_t *sequence = (dds_tt_sequence_type_t*)type_spec;
+        emit_type_spec(sequence->element_type, stream);
+        if (sequence->bounded) {
+          dds_tt_ostream_emit(stream, ",");
+          dds_tt_ostream_emit_ull(stream, sequence->max);
+        }
+        dds_tt_ostream_emit(stream, ">"); 
+      }
+      break;
+    case DDS_TT_STRING_TYPE: 
+      {
+        dds_tt_ostream_emit(stream, "string"); 
+        dds_tt_string_type_t *string = (dds_tt_string_type_t*)type_spec;
+        if (string->bounded) {
+          dds_tt_ostream_emit(stream, "<"); 
+          dds_tt_ostream_emit_ull(stream, string->max);
+          dds_tt_ostream_emit(stream, ">"); 
+        }
+      }
+      break;
+    case DDS_TT_WIDE_STRING_TYPE: 
+      {
+        dds_tt_ostream_emit(stream, "wstring"); 
+        dds_tt_string_type_t *string = (dds_tt_string_type_t*)type_spec;
+        if (string->bounded) {
+          dds_tt_ostream_emit(stream, "<"); 
+          dds_tt_ostream_emit_ull(stream, string->max);
+          dds_tt_ostream_emit(stream, ">"); 
+        }
+      }
+      break;
+    case DDS_TT_FIXED_PT_TYPE: 
+      {
+        dds_tt_ostream_emit(stream, "fixed<"); 
+        dds_tt_fixed_pt_type_t *fixedpt = (dds_tt_fixed_pt_type_t*)type_spec;
+        dds_tt_ostream_emit_ull(stream, fixedpt->digits);
+        dds_tt_ostream_emit(stream, ","); 
+        dds_tt_ostream_emit_ull(stream, fixedpt->fraction_digits);
+        dds_tt_ostream_emit(stream, ">"); 
+      }
+      break;
+    case DDS_TT_MAP_TYPE: 
+      {
+        dds_tt_ostream_emit(stream, "map<"); 
+        dds_tt_map_type_t *map = (dds_tt_map_type_t*)type_spec;
+        emit_type_spec(map->key_type, stream);
+        dds_tt_ostream_emit(stream, ",");
+        emit_type_spec(map->value_type, stream);
+        if (map->bounded) {
+          dds_tt_ostream_emit(stream, ",");
+          dds_tt_ostream_emit_ull(stream, map->max);
+        }
+        dds_tt_ostream_emit(stream, ">"); 
+      }
+      break;
+    default:
+      {
+        char buffer[40];
+        sprintf(buffer, "?%x?", type_spec->flags);
+        dds_tt_ostream_emit(stream, buffer);
+      }
+      break;
+  }
+}
 
 void dds_tt_walker_execute_expr(dds_tt_walker_t *walker, dds_tt_walker_expr_t *expr, dds_tt_exec_state_t *state, dds_tt_ostream_t *stream)
 {
@@ -335,7 +438,7 @@ void dds_tt_walker_execute_expr(dds_tt_walker_t *walker, dds_tt_walker_expr_t *e
       case dds_tt_walker_expr_for_all_case_labels:
 	if (state->cur_node->flags == DDS_TT_UNION_CASE) {
 	  dds_tt_exec_state_t new_state = *state;
-          for (new_state.cur_node = ((dds_tt_union_case_t*)state->cur_node)->labels; new_state.cur_node != NULL; new_state.cur_node = new_state.cur_node->next) {
+          for (new_state.cur_node = state->cur_node->children; new_state.cur_node != NULL; new_state.cur_node = new_state.cur_node->next) {
 	     dds_tt_walker_execute_expr(walker, expr->sub1, &new_state, stream);
 	  }
 	}
@@ -378,10 +481,36 @@ void dds_tt_walker_execute_expr(dds_tt_walker_t *walker, dds_tt_walker_expr_t *e
 	break;
       case dds_tt_walker_expr_end_for:
         break;
+      case dds_tt_walker_expr_emit_type:
+        {
+          dds_tt_type_spec_t base_type;
+          dds_tt_type_spec_t *type_spec = 0;
+          if (state->cur_node->flags == DDS_TT_STRUCT_MEMBER) {
+            type_spec = ((dds_tt_struct_member_t*)state->cur_node)->member_type;
+          }
+          else if (state->cur_node->flags == DDS_TT_UNION) {
+            base_type.flags = ((dds_tt_union_t*)state->cur_node)->switch_type;
+            type_spec = &base_type;
+          }
+          else if (state->cur_node->flags == DDS_TT_UNION_CASE) {
+            type_spec = ((dds_tt_union_case_t*)state->cur_node)->branch_type;
+          }
+          if (type_spec == 0) {
+            dds_tt_ostream_emit(stream, "??");
+          } else {
+            emit_type_spec(type_spec, stream);
+          }
+        }
+        break;
       case dds_tt_walker_expr_emit_name:
 	if (DDS_TT_IS_DEFINITION(state->cur_node->flags)) {
           dds_tt_ostream_emit(stream, ((dds_tt_definition_t*)state->cur_node)->name);
 	}
+        else {
+          char buffer[40];
+          sprintf(buffer, "?%x?", state->cur_node->flags);
+          dds_tt_ostream_emit(stream, buffer);
+        }
 	break;
       case dds_tt_walker_expr_emit:
         dds_tt_ostream_emit(stream, expr->text);

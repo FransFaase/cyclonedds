@@ -34,6 +34,8 @@ extern void dds_tt_stringify(dds_tt_node_t *context, char *buffer, size_t len)
       dds_tt_walker_emit_name(walker);
       dds_tt_walker_emit(walker, "{");
       dds_tt_walker_for_all_members(walker);
+        dds_tt_walker_emit_type(walker);
+        dds_tt_walker_emit(walker, " ");
         dds_tt_walker_for_all_declarators(walker);
 	  dds_tt_walker_emit_name(walker);
 	  dds_tt_walker_emit(walker, ",");
@@ -46,7 +48,9 @@ extern void dds_tt_stringify(dds_tt_node_t *context, char *buffer, size_t len)
     dds_tt_walker_for_all_unions(walker);
       dds_tt_walker_emit(walker, "union ");
       dds_tt_walker_emit_name(walker);
-      dds_tt_walker_emit(walker, "{");
+      dds_tt_walker_emit(walker, " switch(");
+      dds_tt_walker_emit_type(walker);
+      dds_tt_walker_emit(walker, "){");
       dds_tt_walker_for_all_cases(walker);
         dds_tt_walker_for_all_case_labels(walker);
 	  dds_tt_walker_if_default_case_label(walker);
@@ -55,10 +59,9 @@ extern void dds_tt_stringify(dds_tt_node_t *context, char *buffer, size_t len)
 	    dds_tt_walker_emit(walker, "c:");
 	  dds_tt_walker_end_if(walker);
 	dds_tt_walker_end_for(walker);
-        dds_tt_walker_for_all_declarators(walker);
-	  dds_tt_walker_emit_name(walker);
-	  dds_tt_walker_emit(walker, ",");
-        dds_tt_walker_end_for(walker);
+        dds_tt_walker_emit_type(walker);
+        dds_tt_walker_emit(walker, " ");
+	dds_tt_walker_emit_name(walker);
         dds_tt_walker_emit(walker, ";");
       dds_tt_walker_end_for(walker);
       dds_tt_walker_emit(walker, "}");

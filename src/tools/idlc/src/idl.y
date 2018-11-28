@@ -50,7 +50,7 @@ parser_token_matches_keyword(const char *token);
   bool boolean;
   dds_tt_node_flags_t base_type_flags;
   dds_tt_type_spec_t *type_spec;
-  dds_tt_value_t literal;
+  dds_tt_literal_t literal;
   dds_tt_identifier_t identifier;
   dds_tt_operator_type_t operator_type;
   dds_tt_scoped_name_t* scoped_name;
@@ -309,9 +309,9 @@ literal:
   | WIDE_CHARACTER_LITERAL
   | BOOLEAN_LITERAL
       {
-        dds_tt_value_t* value = &($$);
-        value->type = dds_tt_value_boolean;
-        value->value.bln = ($1);
+        dds_tt_literal_t* value = &($$);
+        value->flags = DDS_TT_BOOLEAN_TYPE;
+        value->bln = ($1);
       }
   | STRING_LITERAL
   | WIDE_STRING_LITERAL
@@ -345,9 +345,9 @@ base_type_spec:
 
 /* Basic Types */
 floating_pt_type:
-    FLOAT { $$ = DDS_TT_FLOAT_TYPE; }
-  | DOUBLE { $$ = DDS_TT_DOUBLE_TYPE; }
-  | LONG DOUBLE { $$ = DDS_TT_LONG_DOUBLE_TYPE; };
+    "float" { $$ = DDS_TT_FLOAT_TYPE; }
+  | "double" { $$ = DDS_TT_DOUBLE_TYPE; }
+  | "long" "double" { $$ = DDS_TT_LONG_DOUBLE_TYPE; };
 
 integer_type:
     signed_int
@@ -355,28 +355,28 @@ integer_type:
   ;
 
 signed_int:
-    SHORT { $$ = DDS_TT_SHORT_TYPE; }
-  | LONG { $$ = DDS_TT_LONG_TYPE; }
-  | LONG LONG { $$ = DDS_TT_LONG_LONG_TYPE; }
+    "short" { $$ = DDS_TT_SHORT_TYPE; }
+  | "long" { $$ = DDS_TT_LONG_TYPE; }
+  | "long" "long" { $$ = DDS_TT_LONG_LONG_TYPE; }
   ;
 
 unsigned_int:
-    UNSIGNED SHORT { $$ = DDS_TT_UNSIGNED_SHORT_TYPE; }
-  | UNSIGNED LONG { $$ = DDS_TT_UNSIGNED_LONG_TYPE; }
-  | UNSIGNED LONG LONG { $$ = DDS_TT_UNSIGNED_LONG_LONG_TYPE; }
+    "unsigned" "short" { $$ = DDS_TT_UNSIGNED_SHORT_TYPE; }
+  | "unsigned" "long" { $$ = DDS_TT_UNSIGNED_LONG_TYPE; }
+  | "unsigned" "long" "long" { $$ = DDS_TT_UNSIGNED_LONG_LONG_TYPE; }
   ;
 
 char_type:
-    CHAR { $$ = DDS_TT_CHAR_TYPE; };
+    "char" { $$ = DDS_TT_CHAR_TYPE; };
 
 wide_char_type:
-    WCHAR { $$ = DDS_TT_WIDE_CHAR_TYPE; };
+    "wchar" { $$ = DDS_TT_WIDE_CHAR_TYPE; };
 
 boolean_type:
-    BOOLEAN { $$ = DDS_TT_BOOLEAN_TYPE; };
+    "boolean" { $$ = DDS_TT_BOOLEAN_TYPE; };
 
 octet_type:
-    OCTET { $$ = DDS_TT_OCTET_TYPE; };
+    "octet" { $$ = DDS_TT_OCTET_TYPE; };
 
 template_type_spec:
     sequence_type
@@ -483,8 +483,7 @@ case_label:
   ;
 
 element_spec:
-    type_spec { dds_tt_add_union_element(context, $1); }
-    declarator 
+    type_spec declarator { dds_tt_add_union_element(context, $1); }
   ;
 
 union_forward_dcl:
@@ -662,14 +661,14 @@ unsigned_int:
   | unsigned_longlong_int
   ;
 
-signed_tiny_int: INT8 { $$ = DDS_TT_INT8_TYPE; };
-unsigned_tiny_int: UINT8 { $$ = DDS_TT_UINT8_TYPE; };
-signed_short_int: INT16 { $$ = DDS_TT_SHORT_TYPE; };
-signed_long_int: INT32 { $$ = DDS_TT_LONG_TYPE; };
-signed_longlong_int: INT64 { $$ = DDS_TT_LONG_LONG_TYPE; };
-unsigned_short_int: UINT16 { $$ = DDS_TT_UNSIGNED_SHORT_TYPE; };
-unsigned_long_int: UINT32 { $$ = DDS_TT_UNSIGNED_LONG_TYPE; };
-unsigned_longlong_int: UINT64 { $$ = DDS_TT_UNSIGNED_LONG_LONG_TYPE; };
+signed_tiny_int: "int8" { $$ = DDS_TT_INT8_TYPE; };
+unsigned_tiny_int: "uint8" { $$ = DDS_TT_UINT8_TYPE; };
+signed_short_int: "int16" { $$ = DDS_TT_SHORT_TYPE; };
+signed_long_int: "int32" { $$ = DDS_TT_LONG_TYPE; };
+signed_longlong_int: "int64" { $$ = DDS_TT_LONG_LONG_TYPE; };
+unsigned_short_int: "uint16" { $$ = DDS_TT_UNSIGNED_SHORT_TYPE; };
+unsigned_long_int: "uint32" { $$ = DDS_TT_UNSIGNED_LONG_TYPE; };
+unsigned_longlong_int: "uint64" { $$ = DDS_TT_UNSIGNED_LONG_LONG_TYPE; };
 
 // From Building Block Anonymous Types:
 type_spec: template_type_spec ;
