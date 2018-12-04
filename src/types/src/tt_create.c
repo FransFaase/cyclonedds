@@ -238,6 +238,7 @@ static void init_node(dds_ts_node_t *node, dds_ts_node_flags_t flags, dds_ts_nod
   node->flags = flags;
   node->parent = parent;
   node->children = NULL;
+  node->next = NULL;
   if (parent != NULL) {
     add_child(node, parent);
   }

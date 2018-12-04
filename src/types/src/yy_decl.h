@@ -25,5 +25,7 @@ extern YY_DECL;
 #define YY_NO_INPUT
 #define YY_NO_UNPUT
 
+int parser_token_matches_keyword(const char *token, int *token_number);
+
 #endif /* DDS_TS_YY_DECL_H */
 

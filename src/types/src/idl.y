@@ -28,12 +28,14 @@ typedef void *yyscan_t;
 
 #define YYFPRINTF (unsigned int)fprintf
 
+#define YYPRINT(A,B,C) YYUSE(A) /* to make yytoknum available */
+
 int
 yyerror(
   YYLTYPE *yylloc, yyscan_t yyscanner, dds_ts_context_t *context, char *text);
 
-static int
-parser_token_matches_keyword(const char *token);
+int illegale_identifier(const char *token);
+
 %}
 
 /* There is one shift/reduce conflict, which has not yet been resolved:
@@ -761,7 +763,7 @@ identifier:
         size_t offset = 0;
         if ($1[0] == '_') {
           offset = 1;
-        } else if (parser_token_matches_keyword($1) != 0) {
+        } else if (illegale_identifier($1) != 0) {
           /* FIXME: come up with a better error message */
           yyerror(&yylloc, scanner, context, "Identifier matches a keyword");
           YYABORT;
@@ -797,8 +799,8 @@ yyerror(
   return 0;
 }
 
-static int
-parser_token_matches_keyword(const char *token)
+int
+illegale_identifier(const char *token)
 {
   size_t i, n;
 
@@ -809,8 +811,31 @@ parser_token_matches_keyword(const char *token)
         && yytname[i][    0] == '"'
         && os_strncasecmp(yytname[i] + 1, token, n) == 0
         && yytname[i][n + 1] == '"'
+        && yytname[i][n + 2] == '\0')
+    {
+      return 1;
+    }
+  }
+
+  return 0;
+}
+
+int
+parser_token_matches_keyword(const char *token, int *token_number)
+{
+  size_t i, n;
+
+  assert(token != NULL);
+  assert(token_number != NULL);
+
+  for (i = 0, n = strlen(token); i < YYNTOKENS; i++) {
+    if (yytname[i] != 0
+        && yytname[i][    0] == '"'
+        && strncmp(yytname[i] + 1, token, n) == 0
+        && yytname[i][n + 1] == '"'
         && yytname[i][n + 2] == 0)
     {
+      *token_number = yytoknum[i];
       return 1;
     }
   }

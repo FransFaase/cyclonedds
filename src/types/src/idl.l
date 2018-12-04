@@ -53,6 +53,7 @@
 %option reentrant
 %option bison-bridge
 %option bison-locations
+%option nounistd
 
 number                    [1-9][0-9]*
 octal_number              0[0-7]*
@@ -84,40 +85,6 @@ identifier                [a-zA-Z_][a-zA-Z0-9_]*
 <COMMENT>"\n"             { BEGIN(INITIAL); }
 <COMMENT>.                { }
 
-const                     { return(CONST); }
-unsigned                  { return(UNSIGNED); }
-
-float                     { return(FLOAT); }
-double                    { return(DOUBLE); }
-short                     { return(SHORT); }
-long                      { return(LONG); }
-char                      { return(CHAR); }
-wchar                     { return(WCHAR); }
-boolean                   { return(BOOLEAN); }
-octet                     { return(OCTET); }
-any                       { return(ANY); }
-int8                      { return(INT8); }
-uint8                     { return(UINT8); }
-int16                     { return(INT16); }
-uint16                    { return(UINT16); }
-int32                     { return(INT32); }
-uint32                    { return(UINT32); }
-int64                     { return(INT64); }
-uint64                    { return(UINT64); }
-sequence                  { return(SEQUENCE); }
-string                    { return(STRING); }
-wstring                   { return(WSTRING); }
-fixed                     { return(FIXED); }
-map                       { return(MAP); }
-
-
-module                    { return(MODULE); }
-struct                    { return(STRUCT); }
-union                     { return(UNION); }
-switch                    { return(SWITCH); }
-case                      { return(CASE); }
-default                   { return(DEFAULT); }
-enum                      { return(ENUM); }
 
 TRUE                      {
                             yylval->boolean = true;
@@ -201,6 +168,10 @@ FALSE                     {
 <INWSTRING>"\""           { BEGIN(INITIAL); }
 
 {identifier}              {
+                            int token_number;
+                            if (parser_token_matches_keyword(yytext, &token_number)) {
+                              return token_number;
+                            }
                             yylval->identifier = strdup(yytext);
                             if (yylval->identifier == NULL) {
                               perror("Could not copy identifier"); /* FIXME: use yyerror */
