@@ -155,7 +155,7 @@ int illegale_identifier(const char *token);
 
 /* keywords */
 %token MODULE "module"
-%token CONST "const"
+%token CONSTKW "const"
 %token NATIVE "native"
 %token STRUCT "struct"
 %token TYPEDEF "typedef"
@@ -448,7 +448,7 @@ member:
   ;
 
 struct_forward_dcl:
-    annotation_appls STRUCT identifier
+    annotation_appls "struct" identifier
       { dds_ts_add_struct_forward(context, $3); };
 
 union_dcl:
@@ -494,12 +494,12 @@ element_spec:
   ;
 
 union_forward_dcl:
-    annotation_appls UNION identifier { dds_ts_add_union_forward(context, $3); }
+    annotation_appls "union" identifier { dds_ts_add_union_forward(context, $3); }
   ;
 
 
 enum_dcl:
-    annotation_appls ENUM identifier { dds_ts_add_enum_open(context, $3); }
+    annotation_appls "enum" identifier { dds_ts_add_enum_open(context, $3); }
     '{' enumerator_list '}' { dds_ts_enum_close(context); }
   ;
 
@@ -525,14 +525,14 @@ fixed_array_size:
   ;
 
 native_dcl:
-    annotation_appls NATIVE simple_declarator
+    annotation_appls "native" simple_declarator
       { dds_ts_add_native(context, $3); }
   ;
 
 simple_declarator: identifier ;
 
 typedef_dcl:
-    annotation_appls TYPEDEF { dds_ts_add_typedef_open(context); }
+    annotation_appls "typedef" { dds_ts_add_typedef_open(context); }
     type_declarator
   ;
 
@@ -570,11 +570,11 @@ declarator: simple_declarator
 
 /* From Building Block Extended Data-Types: */
 struct_def:
-    annotation_appls STRUCT identifier ':' scoped_name '{'
+    annotation_appls "struct" identifier ':' scoped_name '{'
       { dds_ts_add_struct_extension_open(context, $3, $5); }
     members '}'
       { dds_ts_struct_close(context); }
-  | annotation_appls STRUCT identifier '{'
+  | annotation_appls "struct" identifier '{'
       { dds_ts_add_struct_open(context, $3); }
     '}'
       { dds_ts_struct_empty_close(context); }
@@ -595,14 +595,14 @@ constr_type_dcl:
    ;
 
 map_type:
-    MAP '<' type_spec ',' type_spec ',' positive_int_const '>'
+    "map" '<' type_spec ',' type_spec ',' positive_int_const '>'
       { $$ = dds_ts_new_map_type(context, $3, $5, &($7)); }
-  | MAP '<' type_spec ',' type_spec '>'
+  | "map" '<' type_spec ',' type_spec '>'
       { $$ = dds_ts_new_map_type_unbound(context, $3, $5); }
   ;
 
 bitset_dcl:
-    BITSET identifier scoped_name_opt
+    "bitset" identifier scoped_name_opt
       { dds_ts_add_bitset_open(context, $2, $3); }
     '{' bitfields '}'
       { dds_ts_bitset_close(context); }
@@ -628,9 +628,9 @@ identifiers:
   ;
 
 bitfield_spec:
-    BITFIELD '<' positive_int_const '>'
+    "bitfield" '<' positive_int_const '>'
       { dds_ts_add_bitset_field(context, &($3)); }
-  | BITFIELD '<' positive_int_const ',' destination_type '>'
+  | "bitfield" '<' positive_int_const ',' destination_type '>'
       { dds_ts_add_bitset_field_to(context, &($3), $5); }
   ;
 
@@ -641,7 +641,7 @@ destination_type:
   ;
 
 bitmask_dcl:
-    BITMASK identifier '{'
+    "bitmask" identifier '{'
       { dds_ts_add_bitmask_open(context, $2); }
     bit_value_list '}'
       { dds_ts_bitmask_close(context); }

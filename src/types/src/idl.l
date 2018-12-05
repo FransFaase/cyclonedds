@@ -53,7 +53,7 @@
 %option reentrant
 %option bison-bridge
 %option bison-locations
-%option nounistd
+%option never-interactive
 
 number                    [1-9][0-9]*
 octal_number              0[0-7]*
