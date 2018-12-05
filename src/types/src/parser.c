@@ -21,6 +21,8 @@
 #define YY_TYPEDEF_YY_SCANNER_T
 typedef void* yyscan_t;
 
+#define YY_NO_UNISTD 1 /* to surpress #include <unistd.h> */
+
 #include "parser.h"
 #include "idl.parser.h"
 #include "yy_decl.h"
