@@ -764,12 +764,10 @@ identifier:
         if ($1[0] == '_') {
           offset = 1;
         } else if (illegale_identifier($1) != 0) {
-          /* FIXME: come up with a better error message */
           yyerror(&yylloc, scanner, context, "Identifier matches a keyword");
           YYABORT;
-        } else if (($$ = strdup($1 + offset)) == NULL) {
-          /* FIXME: come up with a better error message */
-          yyerror(&yylloc, scanner, context, "Memory exhausted");
+        }
+        if (($$ = strdup($1 + offset)) == NULL) {
           YYABORT;
         }
       };

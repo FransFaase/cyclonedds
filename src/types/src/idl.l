@@ -87,22 +87,24 @@ identifier                [a-zA-Z_][a-zA-Z0-9_]*
 
 
 TRUE                      {
+                            yylval->literal.flags = DDS_TS_BOOLEAN_TYPE;
                             yylval->boolean = true;
                             return(BOOLEAN_LITERAL);
                           }
 
 FALSE                     {
+                            yylval->literal.flags = DDS_TS_BOOLEAN_TYPE;
                             yylval->boolean = false;
                             return(BOOLEAN_LITERAL);
                           }
 
 {integer_literal}         {
-                            errno = 0;
-                            /* strtoll recognizes if the value is dec, oct or hex if base is zero */
                             yylval->literal.flags = DDS_TS_LONG_LONG_TYPE;
-                            yylval->literal.llng = strtoll(yytext, NULL, 0); /* FIXME: use strtoll_l */
-                            if (errno == ERANGE && (yylval->literal.llng == LLONG_MIN ||
-                                                    yylval->literal.llng == LLONG_MAX))
+                            /* strtoll recognizes if the value is dec, oct or hex if base is zero */
+                            errno = 0;
+                            yylval->literal.ullng = os_strtoull(yytext, NULL, 0); 
+                            if (errno == ERANGE && (yylval->literal.llng == 0 ||
+                                                    yylval->literal.llng == ULLONG_MAX))
                             {
                               perror("Integer value invalid"); /* FIXME: use yyerror */
                             }
@@ -112,7 +114,7 @@ FALSE                     {
 {floating_pt_literal}     {
                             errno = 0;
                             yylval->literal.flags = DDS_TS_LONG_DOUBLE_TYPE;
-                            yylval->literal.ldbl = strtold(yytext, NULL); /* FIXME: use strtold_l */
+                            yylval->literal.ldbl = os_strtod(yytext, NULL); /* FIXME: implement and use os_strtold */
                             if (errno == ERANGE && (yylval->literal.ldbl == HUGE_VALL ||
                                                     yylval->literal.ldbl == 0))
                             {
@@ -124,7 +126,7 @@ FALSE                     {
 {fixed_pt_literal}        {
                             errno = 0;
                             yylval->literal.flags = DDS_TS_FIXED_PT_TYPE;
-                            yylval->literal.ldbl = strtold(yytext, NULL); /* FIXME: use strtold_l */
+                            yylval->literal.ldbl = os_strtod(yytext, NULL); /* FIXME: use strtold_l */
                             if (errno == ERANGE && (yylval->literal.ldbl == HUGE_VALL ||
                                                     yylval->literal.ldbl == 0))
                             {
@@ -148,7 +150,7 @@ FALSE                     {
 "\""                      { BEGIN(INSTRING); }
 <INSTRING>{string_literal}  {
                             yylval->literal.flags = DDS_TS_STRING_TYPE;
-                            yylval->literal.str = strdup(yytext);
+                            yylval->literal.str = os_strdup(yytext);
                             if (yylval->literal.str == NULL) {
                               perror("Could not copy string_literal"); /* FIXME: use yyerror */
                             }
@@ -159,7 +161,7 @@ FALSE                     {
 "L\""                     { BEGIN(INWSTRING); }
 <INWSTRING>{string_literal} {
                             yylval->literal.flags = DDS_TS_WIDE_STRING_TYPE;
-                            yylval->literal.str = strdup(yytext);
+                            yylval->literal.str = os_strdup(yytext);
                             if (yylval->literal.str == NULL) {
                               perror("Could not copy string_literal"); /* FIXME: use yyerror */
                             }
@@ -172,7 +174,7 @@ FALSE                     {
                             if (parser_token_matches_keyword(yytext, &token_number)) {
                               return token_number;
                             }
-                            yylval->identifier = strdup(yytext);
+                            yylval->identifier = os_strdup(yytext);
                             if (yylval->identifier == NULL) {
                               perror("Could not copy identifier"); /* FIXME: use yyerror */
                             }
