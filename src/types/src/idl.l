@@ -38,6 +38,9 @@
         } \
     }
 
+#define yyerror dds_ts_parser_error
+int yyerror(YYLTYPE *yylloc, yyscan_t yyscanner, dds_ts_context_t *context, char *text);
+
 #include "tools.h"
 %}
 
@@ -103,10 +106,10 @@ FALSE                     {
                             /* strtoll recognizes if the value is dec, oct or hex if base is zero */
                             errno = 0;
                             yylval->literal.ullng = os_strtoull(yytext, NULL, 0); 
-                            if (errno == ERANGE && (yylval->literal.llng == 0 ||
-                                                    yylval->literal.llng == ULLONG_MAX))
+                            if (errno == ERANGE && (yylval->literal.ullng == 0 ||
+                                                    yylval->literal.ullng == ULLONG_MAX))
                             {
-                              perror("Integer value invalid"); /* FIXME: use yyerror */
+                              yyerror(yylloc_param, yyscanner, context, "Integer value invalid");
                             }
                             return INTEGER_LITERAL;
                           }
@@ -118,7 +121,7 @@ FALSE                     {
                             if (errno == ERANGE && (yylval->literal.ldbl == HUGE_VALL ||
                                                     yylval->literal.ldbl == 0))
                             {
-                              perror("Invalid floating_pt_literal"); /* FIXME: use yyerror */
+                              yyerror(yylloc_param, yyscanner, context, "(Invalid floating_pt_literal");
                             }
                             return FLOATING_PT_LITERAL;
                           }
@@ -130,7 +133,7 @@ FALSE                     {
                             if (errno == ERANGE && (yylval->literal.ldbl == HUGE_VALL ||
                                                     yylval->literal.ldbl == 0))
                             {
-                              perror("Invalid fixed_pt_literal"); /* FIXME: use yyerror */
+                              yyerror(yylloc_param, yyscanner, context, "Invalid fixed_pt_literal");
                             }
                             return FIXED_PT_LITERAL;
                           }
@@ -141,7 +144,7 @@ FALSE                     {
                             return CHARACTER_LITERAL;
                           }
 
-"L'"{char_literal}"'"      {
+"L'"{char_literal}"'"     {
                             yylval->literal.flags = DDS_TS_WIDE_CHAR_TYPE;
                             yylval->literal.wchr = dds_ts_unescape_wchar(yytext + 1, NULL);
                             return WIDE_CHARACTER_LITERAL;
@@ -152,7 +155,7 @@ FALSE                     {
                             yylval->literal.flags = DDS_TS_STRING_TYPE;
                             yylval->literal.str = os_strdup(yytext);
                             if (yylval->literal.str == NULL) {
-                              perror("Could not copy string_literal"); /* FIXME: use yyerror */
+                              yyerror(yylloc_param, yyscanner, context, "Could not copy string_literal");
                             }
                             return STRING_LITERAL;
                           }
@@ -163,7 +166,7 @@ FALSE                     {
                             yylval->literal.flags = DDS_TS_WIDE_STRING_TYPE;
                             yylval->literal.str = os_strdup(yytext);
                             if (yylval->literal.str == NULL) {
-                              perror("Could not copy string_literal"); /* FIXME: use yyerror */
+                              yyerror(yylloc_param, yyscanner, context, "Could not copy string_literal");
                             }
                             return WIDE_STRING_LITERAL;
                           }
@@ -176,7 +179,7 @@ FALSE                     {
                             }
                             yylval->identifier = os_strdup(yytext);
                             if (yylval->identifier == NULL) {
-                              perror("Could not copy identifier"); /* FIXME: use yyerror */
+                              yyerror(yylloc_param, yyscanner, context, "Could not copy identifier");
                             }
                             return IDENTIFIER;
                           }
