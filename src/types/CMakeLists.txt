@@ -26,9 +26,6 @@ set(LEXER_BASENAME "idl.lexer.c")
 set(LEXER_PATH "${GENERATED_SOURCE_DIR}/${LEXER_BASENAME}")
 
 bison_target( parser "src/idl.y" "${PARSER_PATH}")
-if (NOT <CXX_COMPILER_ID:MSVC>)
-  set_property(SOURCE "${PARSER_PATH}" PROPERTY COMPILE_FLAGS -Wno-conversion)
-endif()
 flex_target(
   lexer "src/idl.l" "${LEXER_PATH}"
   COMPILE_FLAGS
