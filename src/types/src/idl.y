@@ -154,46 +154,46 @@ int illegale_identifier(const char *token);
 %token RSHIFT ">>"
 
 /* keywords */
-%token MODULE "module"
-%token CONSTKW "const"
-%token NATIVE "native"
-%token STRUCT "struct"
-%token TYPEDEF "typedef"
-%token UNION "union"
-%token SWITCH "switch"
-%token CASE "case"
-%token ENUM "enum"
-%token UNSIGNED "unsigned"
-%token FIXEDKW "fixed"
-%token SEQUENCE "sequence"
-%token STRING "string"
-%token WSTRING "wstring"
+%token DDS_MODULE "module"
+%token DDS_CONST "const"
+%token DDS_NATIVE "native"
+%token DDS_STRUCT "struct"
+%token DDS_TYPEDEF "typedef"
+%token DDS_UNION "union"
+%token DDS_SWITCH "switch"
+%token DDS_CASE "case"
+%token DDS_DEFAULT "default"
+%token DDS_ENUM "enum"
+%token DDS_UNSIGNED "unsigned"
+%token DDS_FIXED "fixed"
+%token DDS_SEQUENCE "sequence"
+%token DDS_STRING "string"
+%token DDS_WSTRING "wstring"
 
-%token FLOATKW "float"
-%token DOUBLE "double"
-%token SHORTKW "short"
-%token LONGKW "long"
-%token CHARKW "char"
-%token WCHARKW "wchar"
-%token BOOLEANKW "boolean"
-%token OCTET "octet"
-%token ANY "any"
+%token DDS_FLOAT "float"
+%token DDS_DOUBLE "double"
+%token DDS_SHORT "short"
+%token DDS_LONG "long"
+%token DDS_CHAR "char"
+%token DDS_WCHAR "wchar"
+%token DDS_BOOLEAN "boolean"
+%token DDS_OCTET "octet"
+%token DDS_ANY "any"
 
-%token MAP "map"
-%token BITSET "bitset"
-%token BITFIELD "bitfield"
-%token BITMASK "bitmask"
+%token DDS_MAP "map"
+%token DDS_BITSET "bitset"
+%token DDS_BITFIELD "bitfield"
+%token DDS_BITMASK "bitmask"
 
-%token INT8KW "int8"
-%token UINT8KW "uint8"
-%token INT16KW "int16"
-%token INT32KW "int32"
-%token INT64KW "int64"
-%token UINT16KW "uint16"
-%token UINT32KW "uint32"
-%token UINT64KW "uint64"
+%token DDS_INT8 "int8"
+%token DDS_UINT8 "uint8"
+%token DDS_INT16 "int16"
+%token DDS_INT32 "int32"
+%token DDS_INT64 "int64"
+%token DDS_UINT16 "uint16"
+%token DDS_UINT32 "uint32"
+%token DDS_UINT64 "uint64"
 
-%token DEFAULT "default"
 %token ANNOTATION "@annotation"
 
 
@@ -712,7 +712,7 @@ annotation_member:
       { dds_ts_annotation_member_close(context); }
   ;
 default_opt:
-    DEFAULT const_expr ';'
+    "default" const_expr ';'
       { dds_ts_annotation_member_set_default(context, &($2)); }
   |
   ;
@@ -723,7 +723,7 @@ annotation_member_type:
 /*  | scoped_name -- included in const_type */
   ;
 
-any_const_type: ANY { $$ = DDS_TS_ANY_TYPE; };
+any_const_type: "any" { $$ = DDS_TS_ANY_TYPE; };
 
 annotation_appls:
     annotation_appl annotation_appls
