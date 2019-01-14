@@ -36,4 +36,4 @@ void dds_ts_walker_main(dds_ts_walker_t *walker);
 void dds_ts_walker_end(dds_ts_walker_t *walker);
 void dds_ts_walker_execute(dds_ts_walker_t *walker, char *buffer, size_t len);
 
-
+void dds_ts_walker_free(dds_ts_walker_t *walker);

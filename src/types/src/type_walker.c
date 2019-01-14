@@ -378,5 +378,28 @@ void dds_ts_walker_execute(dds_ts_walker_t *walker, char *buffer, size_t len)
   dds_ts_walker_execute_expr(walker, walker->main, &state, &stream);
 }
 
+static void dds_ts_walker_expr_free(dds_ts_walker_expr_t *expr)
+{
+  while (expr != NULL) {
+    dds_ts_walker_expr_t *next = expr->next;
+    dds_ts_walker_expr_free(expr->sub1);
+    dds_ts_walker_expr_free(expr->sub2);
+    os_free((void*)expr);
+    expr = next;
+  }
+}
+
+void dds_ts_walker_free(dds_ts_walker_t *walker)
+{
+  dds_ts_walker_proc_def_t *proc_def;
+  for (proc_def = walker->proc_defs; proc_def != NULL;) {
+    dds_ts_walker_proc_def_t *next = proc_def->next;
+    dds_ts_walker_expr_free(proc_def->body);
+    os_free((void*)proc_def);
+    proc_def = next;
+  }
+  dds_ts_walker_expr_free(walker->main);
+  os_free((void*)walker);
+}
 
 

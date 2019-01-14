@@ -94,7 +94,7 @@ identifier                [a-zA-Z_][a-zA-Z0-9_]*
                             if (parser_token_matches_keyword(yytext, &token_number)) {
                               return token_number;
                             }
-                            yylval->identifier = os_strdup(yytext);
+                            yylval->identifier = yytext;
                             if (yylval->identifier == NULL) {
                               yyerror(yylloc_param, yyscanner, context, "Could not copy identifier");
                             }

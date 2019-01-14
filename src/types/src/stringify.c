@@ -53,5 +53,7 @@ extern void dds_ts_stringify(dds_ts_node_t *context, char *buffer, size_t len)
   dds_ts_walker_end(walker);
 
   dds_ts_walker_execute(walker, buffer, len);
+
+  dds_ts_walker_free(walker);
 }
 

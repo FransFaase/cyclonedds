@@ -241,7 +241,7 @@ static bool init_definition(dds_ts_context_t *context, dds_ts_definition_t *defi
 {
   init_node((dds_ts_node_t*)definition, flags, parent);
   if (name != NULL) {
-    definition->name = os_strdup(name);
+    definition->name = name;
     if (definition->name == NULL) {
       context->out_of_memory = true;
       return false;
