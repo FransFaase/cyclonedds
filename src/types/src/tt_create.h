@@ -19,7 +19,6 @@
 typedef struct dds_ts_scoped_name dds_ts_scoped_name_t;
 typedef struct dds_ts_context dds_ts_context_t;
 
-typedef struct dds_ts_context dds_ts_context_t;
 dds_ts_context_t* dds_ts_create_context();
 void dds_ts_context_error(dds_ts_context_t *context, int line, int column, const char *msg);
 void dds_ts_context_set_error_func(dds_ts_context_t *context, void (*error)(int line, int column, const char *msg));

@@ -49,6 +49,7 @@ before_install:
 
 install:
   - if [ "${TRAVIS_OS_NAME}" = "osx" ]; then
+      brew update;
       brew install bison flex;
       brew link --force bison flex;
       export PATH="/usr/local/opt/bison/bin:$PATH";
