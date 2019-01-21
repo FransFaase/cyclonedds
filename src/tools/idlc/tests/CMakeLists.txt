@@ -11,10 +11,12 @@
 #
 include(CUnit)
 
-set(sources
-  "parser.c")
+set(sources_foobar
+  "parser.c"
+  "gen_C99.c"
+  "stringify.c"
+  "type_walker.c")
 
-add_cunit_executable(testtypes ${sources})
-target_include_directories(testtypes PRIVATE "../src")
-target_link_libraries(testtypes OSAPI types)
+add_cunit_executable(testtypes ${sources_foobar})
+target_link_libraries(testtypes OSAPI idll)
 

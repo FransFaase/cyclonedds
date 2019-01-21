@@ -13,22 +13,45 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
+#include "os/os.h"
 #include "CUnit/Test.h"
 
+#include "dds/ddsts/typetree.h"
 #include "parser.h"
+#include "stringify.h"
 
+static void report_error(int line, int column, const char *msg)
+{
+  fprintf(stderr, "ERROR %d.%d: %s\n", line, column, msg);
+}
 
 bool test_parse_stringify(const char *input, const char *output)
 {
+  ddsts_node_t *root_node = NULL;
+  if (ddsts_parse_string(input, report_error, &root_node) != 0) {
+    return false;
+  }
+
   char buffer[1000];
-  dds_ts_parse_string_stringify(input, buffer, 500);
+  buffer[0] = '\0';
+
+  ddsts_ostream_t *ostream = NULL;
+  ddsts_create_ostream_to_buffer(buffer, 999, &ostream);
+  if (ostream == NULL) {
+    return false;
+  }
+  ddsts_stringify(root_node, ostream);
+  os_free((void*)ostream);
+
+  ddsts_free_node(root_node);
+
   if (strcmp(buffer, output) == 0)
   {
     return true;
   }
   /* In case of a difference, print some information (for debugging) */
   printf("Expect:   |%s|\n"
-         "Returned: |%s|\n", buffer, output);
+         "Returned: |%s|\n", output, buffer);
   return false;
 }
 
@@ -211,5 +234,5 @@ CU_Test(parser, module37)
 {
   CU_ASSERT(test_parse_stringify("struct a{char c;};struct b{sequence<a> s;};",
                                  "struct a{char c,;}struct b{sequence<a> s,;}"));
-} 
+}
 

@@ -17,8 +17,8 @@
 #include "os/os.h"
 
 /* YYSTYPE and YYLTYPE defines are required because idl.y defines api.prefix */
-#define YYSTYPE DDS_TS_PARSER_STYPE
-#define YYLTYPE DDS_TS_PARSER_LTYPE
+#define YYSTYPE DDSTS_PARSER_STYPE
+#define YYLTYPE DDSTS_PARSER_LTYPE
 
 #include "idl.parser.h"
 /* YY_DECL must be defined here because yyparse passes an additional argument */
@@ -37,8 +37,8 @@
       } \
     }
 
-#define yyerror dds_ts_parser_error
-int yyerror(YYLTYPE *yylloc, yyscan_t yyscanner, dds_ts_context_t *context, char *text);
+#define yyerror ddsts_parser_error
+int yyerror(YYLTYPE *yylloc, yyscan_t yyscanner, ddsts_context_t *context, char *text);
 
 %}
 
@@ -50,7 +50,7 @@ int yyerror(YYLTYPE *yylloc, yyscan_t yyscanner, dds_ts_context_t *context, char
 %option noyywrap
 %option nounistd
 %option never-interactive
-%option prefix="dds_ts_parser_"
+%option prefix="ddsts_parser_"
 %option reentrant
 %option bison-bridge
 %option bison-locations
@@ -78,7 +78,7 @@ identifier                [a-zA-Z_][a-zA-Z0-9_]*
 
 
 {integer_literal}         {
-                            yylval->literal.flags = DDS_TS_UNSIGNED_LONG_LONG_TYPE;
+                            yylval->literal.flags = DDSTS_UNSIGNED_LONG_LONG_TYPE;
                             /* strtoll recognizes if the value is dec, oct or hex if base is zero */
                             int saved_errno = os_getErrno();
                             os_setErrno(0);

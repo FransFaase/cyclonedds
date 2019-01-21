@@ -9,25 +9,9 @@
  *
  * SPDX-License-Identifier: EPL-2.0 OR BSD-3-Clause
  */
-#ifndef DDS_TS_YY_DECL_H
-#define DDS_TS_YY_DECL_H
+#include "dds/ddsts/typetree.h"
+#include "type_walker.h"
 
-#define YY_DECL int dds_ts_parser_lex \
-  (YYSTYPE * yylval_param, \
-   YYLTYPE * yylloc_param, \
-   yyscan_t yyscanner, \
-   dds_ts_context_t *context)
+void ddsts_stringify(ddsts_node_t *root_node, ddsts_ostream_t *ostream);
 
-extern YY_DECL;
-
-#define YY_USER_INIT (void)context;
-
-#define YY_NO_INPUT
-#define YY_NO_UNPUT
-
-int parser_token_matches_keyword(const char *token, int *token_number);
-
-#define YYTYPE_INT16 int
-
-#endif /* DDS_TS_YY_DECL_H */
 

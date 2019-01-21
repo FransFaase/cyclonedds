@@ -14,7 +14,9 @@
 #include <stdlib.h>
 #include <stdbool.h>
 
+#include "dds/ddsts/typetree.h"
 #include "parser.h"
+#include "gen_c99.h"
 
 static void
 usage(const char *prog)
@@ -30,13 +32,19 @@ void report_error(int line, int column, const char *msg)
 int
 main(int argc, char *argv[])
 {
-  int ret = EXIT_FAILURE;
-
   if (argc != 2) {
     usage(argv[0]);
-  } else if (dds_ts_parse_file(argv[1], report_error) == 0) {
-    ret = EXIT_SUCCESS;
+    return EXIT_FAILURE;
   }
 
-  return ret;
+  ddsts_node_t *root_node = NULL;
+  if (ddsts_parse_file(argv[1], report_error, &root_node) != 0) {
+    return EXIT_FAILURE;
+  }
+
+  ddsts_generate_C99(argv[1], root_node);
+
+  ddsts_free_node(root_node);
+
+  return EXIT_SUCCESS;
 }

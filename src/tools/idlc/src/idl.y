@@ -32,7 +32,7 @@ typedef void *yyscan_t;
 
 int
 yyerror(
-  YYLTYPE *yylloc, yyscan_t yyscanner, dds_ts_context_t *context, char *text);
+  YYLTYPE *yylloc, yyscan_t yyscanner, ddsts_context_t *context, char *text);
 
 int illegal_identifier(const char *token);
 
@@ -40,28 +40,28 @@ int illegal_identifier(const char *token);
 
 %code requires {
 
-#include "typetree.h"
-#include "tt_create.h"
 #include "os/os.h"
+#include "dds/ddsts/typetree.h"
+#include "tt_create.h"
 
 }
 
 
 %union {
-  dds_ts_node_flags_t base_type_flags;
-  dds_ts_type_spec_ptr_t type_spec_ptr;
-  dds_ts_literal_t literal;
-  dds_ts_identifier_t identifier;
-  dds_ts_scoped_name_t* scoped_name;
+  ddsts_node_flags_t base_type_flags;
+  ddsts_type_spec_ptr_t type_spec_ptr;
+  ddsts_literal_t literal;
+  ddsts_identifier_t identifier;
+  ddsts_scoped_name_t* scoped_name;
 }
 
 %define api.pure full
-%define api.prefix {dds_ts_parser_}
+%define api.prefix {ddsts_parser_}
 %define parse.trace
 
 %locations
 %param {yyscan_t scanner}
-%param {dds_ts_context_t *context}
+%param {ddsts_context_t *context}
 
 %token-table
 
@@ -101,6 +101,7 @@ int illegal_identifier(const char *token);
   wide_string_type
   fixed_pt_type
   map_type
+  struct_def
 
 %type <scoped_name>
   scoped_name
@@ -179,29 +180,29 @@ definition:
 module_dcl:
     "module" identifier
       {
-        if (!dds_ts_module_open(context, $2)) {
+        if (!ddsts_module_open(context, $2)) {
           YYABORT;
         }
       }
     '{' definitions '}'
-      { dds_ts_module_close(context); };
+      { ddsts_module_close(context); };
 
 scoped_name:
     identifier
       {
-        if (!dds_ts_new_scoped_name(context, 0, false, $1, &($$))) {
+        if (!ddsts_new_scoped_name(context, 0, false, $1, &($$))) {
           YYABORT;
         }
       }
   | "::" identifier
       {
-        if (!dds_ts_new_scoped_name(context, 0, true, $2, &($$))) {
+        if (!ddsts_new_scoped_name(context, 0, true, $2, &($$))) {
           YYABORT;
         }
       }
   | scoped_name "::" identifier
       {
-        if (!dds_ts_new_scoped_name(context, $1, false, $3, &($$))) {
+        if (!ddsts_new_scoped_name(context, $1, false, $3, &($$))) {
           YYABORT;
         }
       }
@@ -230,13 +231,13 @@ type_spec:
 simple_type_spec:
     base_type_spec
       {
-        if (!dds_ts_new_base_type(context, $1, &($$))) {
+        if (!ddsts_new_base_type(context, $1, &($$))) {
           YYABORT;
         }
       }
   | scoped_name
       {
-        if (!dds_ts_get_type_spec_from_scoped_name(context, $1, &($$))) {
+        if (!ddsts_get_type_spec_from_scoped_name(context, $1, &($$))) {
           YYABORT;
         }
       }
@@ -253,9 +254,9 @@ base_type_spec:
 
 /* Basic Types */
 floating_pt_type:
-    "float" { $$ = DDS_TS_FLOAT_TYPE; }
-  | "double" { $$ = DDS_TS_DOUBLE_TYPE; }
-  | "long" "double" { $$ = DDS_TS_LONG_DOUBLE_TYPE; };
+    "float" { $$ = DDSTS_FLOAT_TYPE; }
+  | "double" { $$ = DDSTS_DOUBLE_TYPE; }
+  | "long" "double" { $$ = DDSTS_LONG_DOUBLE_TYPE; };
 
 integer_type:
     signed_int
@@ -263,28 +264,28 @@ integer_type:
   ;
 
 signed_int:
-    "short" { $$ = DDS_TS_SHORT_TYPE; }
-  | "long" { $$ = DDS_TS_LONG_TYPE; }
-  | "long" "long" { $$ = DDS_TS_LONG_LONG_TYPE; }
+    "short" { $$ = DDSTS_SHORT_TYPE; }
+  | "long" { $$ = DDSTS_LONG_TYPE; }
+  | "long" "long" { $$ = DDSTS_LONG_LONG_TYPE; }
   ;
 
 unsigned_int:
-    "unsigned" "short" { $$ = DDS_TS_UNSIGNED_SHORT_TYPE; }
-  | "unsigned" "long" { $$ = DDS_TS_UNSIGNED_LONG_TYPE; }
-  | "unsigned" "long" "long" { $$ = DDS_TS_UNSIGNED_LONG_LONG_TYPE; }
+    "unsigned" "short" { $$ = DDSTS_UNSIGNED_SHORT_TYPE; }
+  | "unsigned" "long" { $$ = DDSTS_UNSIGNED_LONG_TYPE; }
+  | "unsigned" "long" "long" { $$ = DDSTS_UNSIGNED_LONG_LONG_TYPE; }
   ;
 
 char_type:
-    "char" { $$ = DDS_TS_CHAR_TYPE; };
+    "char" { $$ = DDSTS_CHAR_TYPE; };
 
 wide_char_type:
-    "wchar" { $$ = DDS_TS_WIDE_CHAR_TYPE; };
+    "wchar" { $$ = DDSTS_WIDE_CHAR_TYPE; };
 
 boolean_type:
-    "boolean" { $$ = DDS_TS_BOOLEAN_TYPE; };
+    "boolean" { $$ = DDSTS_BOOLEAN_TYPE; };
 
 octet_type:
-    "octet" { $$ = DDS_TS_OCTET_TYPE; };
+    "octet" { $$ = DDSTS_OCTET_TYPE; };
 
 template_type_spec:
     sequence_type
@@ -296,13 +297,13 @@ template_type_spec:
 sequence_type:
     "sequence" '<' type_spec ',' positive_int_const '>'
       {
-        if (!dds_ts_new_sequence(context, &($3), &($5), &($$))) {
+        if (!ddsts_new_sequence(context, &($3), &($5), &($$))) {
           YYABORT;
         }
       }
   | "sequence" '<' type_spec '>'
       {
-        if (!dds_ts_new_sequence_unbound(context, &($3), &($$))) {
+        if (!ddsts_new_sequence_unbound(context, &($3), &($$))) {
           YYABORT;
         }
       }
@@ -311,13 +312,13 @@ sequence_type:
 string_type:
     "string" '<' positive_int_const '>'
       {
-        if (!dds_ts_new_string(context, &($3), &($$))) {
+        if (!ddsts_new_string(context, &($3), &($$))) {
           YYABORT;
         }
       }
   | "string"
       {
-        if (!dds_ts_new_string_unbound(context, &($$))) {
+        if (!ddsts_new_string_unbound(context, &($$))) {
           YYABORT;
         }
       }
@@ -326,13 +327,13 @@ string_type:
 wide_string_type:
     "wstring" '<' positive_int_const '>'
       {
-        if (!dds_ts_new_wide_string(context, &($3), &($$))) {
+        if (!ddsts_new_wide_string(context, &($3), &($$))) {
           YYABORT;
         }
       }
   | "wstring"
       {
-        if (!dds_ts_new_wide_string_unbound(context, &($$))) {
+        if (!ddsts_new_wide_string_unbound(context, &($$))) {
           YYABORT;
         }
       }
@@ -341,7 +342,7 @@ wide_string_type:
 fixed_pt_type:
     "fixed" '<' positive_int_const ',' positive_int_const '>'
       {
-        if (!dds_ts_new_fixed_pt(context, &($3), &($5), &($$))) {
+        if (!ddsts_new_fixed_pt(context, &($3), &($5), &($$))) {
           YYABORT;
         }
       }
@@ -359,12 +360,12 @@ struct_dcl:
 struct_def:
     "struct" identifier '{'
       {
-        if (!dds_ts_add_struct_open(context, $2)) {
+        if (!ddsts_add_struct_open(context, $2)) {
           YYABORT;
         }
       }
     members '}'
-      { dds_ts_struct_close(context); }
+      { ddsts_struct_close(context, &($$)); }
   ;
 members:
     member members
@@ -374,17 +375,21 @@ members:
 member:
     type_spec
       {
-        if (!dds_ts_add_struct_member(context, &($1))) {
+        if (!ddsts_add_struct_member(context, &($1))) {
           YYABORT;
         }
       }
     declarators ';'
+/* Embedded struct extension: */
+  | struct_def { ddsts_add_struct_member(context, &($1)); }
+    declarators ';'
+
   ;
 
 struct_forward_dcl:
     "struct" identifier
       {
-        if (!dds_ts_add_struct_forward(context, $2)) {
+        if (!ddsts_add_struct_forward(context, $2)) {
           YYABORT;
         }
       };
@@ -393,7 +398,7 @@ array_declarator:
     identifier
     fixed_array_sizes
       {
-        if (!dds_ts_add_declarator(context, $1)) {
+        if (!ddsts_add_declarator(context, $1)) {
           YYABORT;
         }
       }
@@ -407,7 +412,7 @@ fixed_array_sizes:
 fixed_array_size:
     '[' positive_int_const ']'
       {
-        if (!dds_ts_add_array_size(context, &($2))) {
+        if (!ddsts_add_array_size(context, &($2))) {
           YYABORT;
         }
       }
@@ -422,7 +427,7 @@ declarators:
 
 declarator: simple_declarator
       {
-        if (!dds_ts_add_declarator(context, $1)) {
+        if (!ddsts_add_declarator(context, $1)) {
           YYABORT;
         }
       };
@@ -432,20 +437,20 @@ declarator: simple_declarator
 struct_def:
     "struct" identifier ':' scoped_name '{'
       {
-        if (!dds_ts_add_struct_extension_open(context, $2, $4)) {
+        if (!ddsts_add_struct_extension_open(context, $2, $4)) {
           YYABORT;
         }
       }
     members '}'
-      { dds_ts_struct_close(context); }
+      { ddsts_struct_close(context, &($$)); }
   | "struct" identifier '{'
       {
-        if (!dds_ts_add_struct_open(context, $2)) {
+        if (!ddsts_add_struct_open(context, $2)) {
           YYABORT;
         }
       }
     '}'
-      { dds_ts_struct_empty_close(context); }
+      { ddsts_struct_empty_close(context, &($$)); }
   ;
 
 template_type_spec:
@@ -455,13 +460,13 @@ template_type_spec:
 map_type:
     "map" '<' type_spec ',' type_spec ',' positive_int_const '>'
       {
-        if (!dds_ts_new_map(context, &($3), &($5), &($7), &($$))) {
+        if (!ddsts_new_map(context, &($3), &($5), &($7), &($$))) {
           YYABORT;
         }
       }
   | "map" '<' type_spec ',' type_spec '>'
       {
-        if (!dds_ts_new_map_unbound(context, &($3), &($5), &($$))) {
+        if (!ddsts_new_map_unbound(context, &($3), &($5), &($$))) {
           YYABORT;
         }
       }
@@ -481,14 +486,14 @@ unsigned_int:
   | unsigned_longlong_int
   ;
 
-signed_tiny_int: "int8" { $$ = DDS_TS_INT8_TYPE; };
-unsigned_tiny_int: "uint8" { $$ = DDS_TS_UINT8_TYPE; };
-signed_short_int: "int16" { $$ = DDS_TS_SHORT_TYPE; };
-signed_long_int: "int32" { $$ = DDS_TS_LONG_TYPE; };
-signed_longlong_int: "int64" { $$ = DDS_TS_LONG_LONG_TYPE; };
-unsigned_short_int: "uint16" { $$ = DDS_TS_UNSIGNED_SHORT_TYPE; };
-unsigned_long_int: "uint32" { $$ = DDS_TS_UNSIGNED_LONG_TYPE; };
-unsigned_longlong_int: "uint64" { $$ = DDS_TS_UNSIGNED_LONG_LONG_TYPE; };
+signed_tiny_int: "int8" { $$ = DDSTS_INT8_TYPE; };
+unsigned_tiny_int: "uint8" { $$ = DDSTS_UINT8_TYPE; };
+signed_short_int: "int16" { $$ = DDSTS_SHORT_TYPE; };
+signed_long_int: "int32" { $$ = DDSTS_LONG_TYPE; };
+signed_longlong_int: "int64" { $$ = DDSTS_LONG_LONG_TYPE; };
+unsigned_short_int: "uint16" { $$ = DDSTS_UNSIGNED_SHORT_TYPE; };
+unsigned_long_int: "uint32" { $$ = DDSTS_UNSIGNED_LONG_TYPE; };
+unsigned_longlong_int: "uint64" { $$ = DDSTS_UNSIGNED_LONG_LONG_TYPE; };
 
 /* From Building Block Anonymous Types: */
 type_spec: template_type_spec ;
@@ -506,7 +511,7 @@ identifier:
           yyerror(&yylloc, scanner, context, "Identifier collides with a keyword");
         }
         if (($$ = os_strdup($1 + offset)) == NULL) {
-          dds_ts_context_set_out_of_memory_error(context);
+          ddsts_context_set_out_of_memory_error(context);
           YYABORT;
         }
       };
@@ -516,10 +521,10 @@ identifier:
 
 int
 yyerror(
-  YYLTYPE *yylloc, yyscan_t yyscanner, dds_ts_context_t *context, char *text)
+  YYLTYPE *yylloc, yyscan_t yyscanner, ddsts_context_t *context, char *text)
 {
   (void)yyscanner;
-  dds_ts_context_error(context, yylloc->first_line, yylloc->first_column, text);
+  ddsts_context_error(context, yylloc->first_line, yylloc->first_column, text);
   return 0;
 }
 
