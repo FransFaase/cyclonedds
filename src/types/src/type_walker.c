@@ -28,16 +28,22 @@ struct dds_ts_walker_proc_def {
 };
 
 typedef enum {
+  dds_ts_walker_expr_for_all_children,
   dds_ts_walker_expr_for_all_modules,
   dds_ts_walker_expr_for_all_structs,
   dds_ts_walker_expr_for_all_members,
   dds_ts_walker_expr_for_all_declarators,
-  dds_ts_walker_expr_end_for,
+  dds_ts_walker_expr_for_call_parent,
+  dds_ts_walker_expr_for_struct_member_type,
+  dds_ts_walker_expr_for_sequence_element_type,
+  dds_ts_walker_expr_if_is_type,
+  dds_ts_walker_expr_if_func,
+  dds_ts_walker_expr_emit,
   dds_ts_walker_expr_emit_type,
   dds_ts_walker_expr_emit_name,
-  dds_ts_walker_expr_emit,
   dds_ts_walker_expr_end_def,
   dds_ts_walker_expr_call_proc,
+  dds_ts_walker_expr_call_func,
 } dds_ts_walker_expr_type_t;
 
 struct dds_ts_walker_expr {
@@ -46,6 +52,10 @@ struct dds_ts_walker_expr {
   dds_ts_walker_expr_t *sub1;
   dds_ts_walker_expr_t *sub2;
   const char *text;
+  dds_ts_node_flags_t flags;
+  char ch;
+  bool (*cond_func)(dds_ts_node_t *node);
+  dds_ts_walker_call_func_t call_func;
   dds_ts_walker_expr_t *next;
 };
 
@@ -68,7 +78,7 @@ dds_ts_walker_t *dds_ts_create_walker(dds_ts_node_t *root_node)
   return walker;
 }
 
-void dds_ts_walker_def_proc(dds_ts_walker_t *walker, const char *name)
+extern void dds_ts_walker_def_proc(dds_ts_walker_t *walker, const char *name)
 {
   dds_ts_walker_proc_def_t *proc_def = (dds_ts_walker_proc_def_t*)os_malloc(sizeof(dds_ts_walker_proc_def_t));
   proc_def->name = name;
@@ -86,305 +96,395 @@ static dds_ts_walker_expr_t *dds_ts_create_expr(dds_ts_walker_expr_type_t type, 
   expr->sub1 = NULL;
   expr->sub2 = NULL;
   expr->text = NULL;
+  expr->flags = 0;
+  expr->ch = '\0';
+  expr->cond_func = 0;
+  expr->call_func = 0;
   expr->next = NULL;
   *walker->ref_next_expr = expr;
   walker->ref_next_expr = &expr->next;
   return expr;
 }
 
-void dds_ts_walker_for_all_modules(dds_ts_walker_t *walker)
+static void open_expr(dds_ts_walker_t *walker, dds_ts_walker_expr_t *expr)
 {
-  dds_ts_walker_expr_t *expr = dds_ts_create_expr(dds_ts_walker_expr_for_all_modules, walker);
   walker->ref_next_expr = &expr->sub1;
   walker->cur_parent_expr = expr;
 }
 
-void dds_ts_walker_for_all_structs(dds_ts_walker_t *walker)
-{
-  dds_ts_walker_expr_t *expr = dds_ts_create_expr(dds_ts_walker_expr_for_all_structs, walker);
-  walker->ref_next_expr = &expr->sub1;
-  walker->cur_parent_expr = expr;
-  OS_UNUSED_ARG(walker);
-}
-
-void dds_ts_walker_for_all_members(dds_ts_walker_t *walker)
-{
-  dds_ts_walker_expr_t *expr = dds_ts_create_expr(dds_ts_walker_expr_for_all_members, walker);
-  walker->ref_next_expr = &expr->sub1;
-  walker->cur_parent_expr = expr;
-}
-
-void dds_ts_walker_for_all_declarators(dds_ts_walker_t *walker)
-{
-  dds_ts_walker_expr_t *expr = dds_ts_create_expr(dds_ts_walker_expr_for_all_declarators, walker);
-  walker->ref_next_expr = &expr->sub1;
-  walker->cur_parent_expr = expr;
-}
-
-void dds_ts_walker_end_for(dds_ts_walker_t *walker)
+static void close_expr(dds_ts_walker_t *walker)
 {
   walker->ref_next_expr = &walker->cur_parent_expr->next;
   walker->cur_parent_expr = walker->cur_parent_expr->parent;
 }
 
-void dds_ts_walker_emit_type(dds_ts_walker_t *walker)
+static void create_open_expr(dds_ts_walker_t *walker, dds_ts_walker_expr_type_t type)
 {
-  dds_ts_walker_expr_t *expr = dds_ts_create_expr(dds_ts_walker_expr_emit_type, walker);
-  OS_UNUSED_ARG(expr);
+  dds_ts_walker_expr_t *expr = dds_ts_create_expr(type, walker);
+  open_expr(walker, expr);
 }
 
-void dds_ts_walker_emit_name(dds_ts_walker_t *walker)
+extern void dds_ts_walker_for_all_children(dds_ts_walker_t *walker)
 {
-  dds_ts_walker_expr_t *expr = dds_ts_create_expr(dds_ts_walker_expr_emit_name, walker);
-  (void)expr;
+  create_open_expr(walker, dds_ts_walker_expr_for_all_children);
 }
 
-void dds_ts_walker_emit(dds_ts_walker_t *walker, const char *text)
+extern void dds_ts_walker_for_all_modules(dds_ts_walker_t *walker)
+{
+  create_open_expr(walker, dds_ts_walker_expr_for_all_modules);
+}
+
+extern void dds_ts_walker_for_all_structs(dds_ts_walker_t *walker)
+{
+  create_open_expr(walker, dds_ts_walker_expr_for_all_structs);
+}
+
+extern void dds_ts_walker_for_all_members(dds_ts_walker_t *walker)
+{
+  create_open_expr(walker, dds_ts_walker_expr_for_all_members);
+}
+
+extern void dds_ts_walker_for_all_declarators(dds_ts_walker_t *walker)
+{
+  create_open_expr(walker, dds_ts_walker_expr_for_all_declarators);
+}
+
+extern void dds_ts_walker_for_call_parent(dds_ts_walker_t *walker)
+{
+  create_open_expr(walker, dds_ts_walker_expr_for_call_parent);
+}
+
+extern void dds_ts_walker_for_struct_member_type(dds_ts_walker_t *walker)
+{
+  create_open_expr(walker, dds_ts_walker_expr_for_struct_member_type);
+}
+
+extern void dds_ts_walker_for_sequence_element_type(dds_ts_walker_t *walker)
+{
+  create_open_expr(walker, dds_ts_walker_expr_for_sequence_element_type);
+}
+
+extern void dds_ts_walker_end_for(dds_ts_walker_t *walker)
+{
+  walker->ref_next_expr = &walker->cur_parent_expr->next;
+  walker->cur_parent_expr = walker->cur_parent_expr->parent;
+}
+
+extern void dds_ts_walker_if_is_type(dds_ts_walker_t *walker, dds_ts_node_flags_t flags)
+{
+  dds_ts_walker_expr_t *expr = dds_ts_create_expr(dds_ts_walker_expr_if_is_type, walker);
+  expr->flags = flags;
+  open_expr(walker, expr);
+}
+
+extern void dds_ts_walker_if_func(dds_ts_walker_t *walker, bool (*func)(dds_ts_node_t *node))
+{
+  dds_ts_walker_expr_t *expr = dds_ts_create_expr(dds_ts_walker_expr_if_func, walker);
+  expr->cond_func = func;
+  open_expr(walker, expr);
+}
+
+extern void dds_ts_walker_else(dds_ts_walker_t *walker)
+{
+  walker->ref_next_expr = &walker->cur_parent_expr->sub2;
+}
+
+extern void dds_ts_walker_end_if(dds_ts_walker_t *walker)
+{
+  close_expr(walker);
+}
+
+extern void dds_ts_walker_emit(dds_ts_walker_t *walker, const char *text)
 {
   dds_ts_walker_expr_t *expr = dds_ts_create_expr(dds_ts_walker_expr_emit, walker);
   expr->text = text;
 }
 
-void dds_ts_walker_end_def(dds_ts_walker_t *walker)
+extern void dds_ts_walker_emit_type(dds_ts_walker_t *walker)
+{
+  dds_ts_walker_expr_t *expr = dds_ts_create_expr(dds_ts_walker_expr_emit_type, walker);
+  OS_UNUSED_ARG(expr);
+}
+
+extern void dds_ts_walker_emit_name(dds_ts_walker_t *walker)
+{
+  dds_ts_walker_expr_t *expr = dds_ts_create_expr(dds_ts_walker_expr_emit_name, walker);
+  OS_UNUSED_ARG(expr);
+}
+
+extern void dds_ts_walker_end_def(dds_ts_walker_t *walker)
 {
   walker->ref_next_expr = NULL;
 }
 
-void dds_ts_walker_call_proc(dds_ts_walker_t *walker, const char *name)
+extern void dds_ts_walker_call_proc(dds_ts_walker_t *walker, const char *name)
 {
   dds_ts_walker_expr_t *expr = dds_ts_create_expr(dds_ts_walker_expr_call_proc, walker);
   expr->text = name;
 }
 
-void dds_ts_walker_main(dds_ts_walker_t *walker)
+extern void dds_ts_walker_call_func(dds_ts_walker_t *walker, dds_ts_walker_call_func_t func)
+{
+  dds_ts_walker_expr_t *expr = dds_ts_create_expr(dds_ts_walker_expr_call_func, walker);
+  expr->call_func = func;
+}
+
+extern void dds_ts_walker_main(dds_ts_walker_t *walker)
 {
   walker->ref_next_expr = &walker->main;
 }
 
-void dds_ts_walker_end(dds_ts_walker_t *walker)
+extern void dds_ts_walker_end(dds_ts_walker_t *walker)
 {
   walker->ref_next_expr = NULL;
 }
 
-typedef struct
+static void dds_ts_ostream_emit(dds_ts_ostream_t *ostream, const char *s)
 {
-  char *s;
-  const char *e;
-} dds_ts_ostream_t;
-
-static void dds_ts_ostream_init(dds_ts_ostream_t *stream, char *buffer, size_t len)
-{
-  stream->s = buffer;
-  stream->e = buffer + len - 1;
+  dds_ts_ostream_puts(ostream, s);
 }
 
-static void dds_ts_ostream_emit(dds_ts_ostream_t *stream, const char *s)
-{
-  while(*s != '\0' && stream->s < stream->e) {
-    *stream->s++ = *s++;
-  }
-  *stream->s = '\0';
-}
-
-static void dds_ts_ostream_emit_ull(dds_ts_ostream_t *stream, unsigned long long ull)
+static void dds_ts_ostream_emit_ull(dds_ts_ostream_t *ostream, unsigned long long ull)
 {
   char buffer[100];
   os_ulltostr(ull, buffer, 99, NULL);
-  dds_ts_ostream_emit(stream, buffer);
+  dds_ts_ostream_emit(ostream, buffer);
 }
 
-typedef struct {
-  dds_ts_node_t *cur_node;
-} dds_ts_exec_state_t;
-
-void emit_type_spec(dds_ts_type_spec_t *type_spec, dds_ts_ostream_t *stream)
+extern void emit_type_spec(dds_ts_type_spec_t *type_spec, dds_ts_ostream_t *ostream)
 {
   switch (type_spec->node.flags)
   {
-    case DDS_TS_SHORT_TYPE: dds_ts_ostream_emit(stream, "short"); break;
-    case DDS_TS_LONG_TYPE: dds_ts_ostream_emit(stream, "long"); break;
-    case DDS_TS_LONG_LONG_TYPE: dds_ts_ostream_emit(stream, "long long"); break;
-    case DDS_TS_UNSIGNED_SHORT_TYPE: dds_ts_ostream_emit(stream, "unsigned short"); break;
-    case DDS_TS_UNSIGNED_LONG_TYPE: dds_ts_ostream_emit(stream, "unsigned long"); break;
-    case DDS_TS_UNSIGNED_LONG_LONG_TYPE: dds_ts_ostream_emit(stream, "unsigned long long"); break;
-    case DDS_TS_CHAR_TYPE: dds_ts_ostream_emit(stream, "char"); break;
-    case DDS_TS_WIDE_CHAR_TYPE: dds_ts_ostream_emit(stream, "wchar"); break;
-    case DDS_TS_OCTET_TYPE: dds_ts_ostream_emit(stream, "octet"); break;
-    case DDS_TS_INT8_TYPE: dds_ts_ostream_emit(stream, "int8"); break;
-    case DDS_TS_UINT8_TYPE: dds_ts_ostream_emit(stream, "uint8"); break;
-    case DDS_TS_BOOLEAN_TYPE: dds_ts_ostream_emit(stream, "bool"); break;
-    case DDS_TS_FLOAT_TYPE: dds_ts_ostream_emit(stream, "float"); break;
-    case DDS_TS_DOUBLE_TYPE: dds_ts_ostream_emit(stream, "double"); break;
-    case DDS_TS_LONG_DOUBLE_TYPE: dds_ts_ostream_emit(stream, "long double"); break;
-    case DDS_TS_FIXED_PT_CONST_TYPE: dds_ts_ostream_emit(stream, "fixed"); break;
-    case DDS_TS_ANY_TYPE: dds_ts_ostream_emit(stream, "any"); break;
+    case DDS_TS_SHORT_TYPE: dds_ts_ostream_emit(ostream, "short"); break;
+    case DDS_TS_LONG_TYPE: dds_ts_ostream_emit(ostream, "long"); break;
+    case DDS_TS_LONG_LONG_TYPE: dds_ts_ostream_emit(ostream, "long long"); break;
+    case DDS_TS_UNSIGNED_SHORT_TYPE: dds_ts_ostream_emit(ostream, "unsigned short"); break;
+    case DDS_TS_UNSIGNED_LONG_TYPE: dds_ts_ostream_emit(ostream, "unsigned long"); break;
+    case DDS_TS_UNSIGNED_LONG_LONG_TYPE: dds_ts_ostream_emit(ostream, "unsigned long long"); break;
+    case DDS_TS_CHAR_TYPE: dds_ts_ostream_emit(ostream, "char"); break;
+    case DDS_TS_WIDE_CHAR_TYPE: dds_ts_ostream_emit(ostream, "wchar"); break;
+    case DDS_TS_OCTET_TYPE: dds_ts_ostream_emit(ostream, "octet"); break;
+    case DDS_TS_INT8_TYPE: dds_ts_ostream_emit(ostream, "int8"); break;
+    case DDS_TS_UINT8_TYPE: dds_ts_ostream_emit(ostream, "uint8"); break;
+    case DDS_TS_BOOLEAN_TYPE: dds_ts_ostream_emit(ostream, "bool"); break;
+    case DDS_TS_FLOAT_TYPE: dds_ts_ostream_emit(ostream, "float"); break;
+    case DDS_TS_DOUBLE_TYPE: dds_ts_ostream_emit(ostream, "double"); break;
+    case DDS_TS_LONG_DOUBLE_TYPE: dds_ts_ostream_emit(ostream, "long double"); break;
+    case DDS_TS_FIXED_PT_CONST_TYPE: dds_ts_ostream_emit(ostream, "fixed"); break;
+    case DDS_TS_ANY_TYPE: dds_ts_ostream_emit(ostream, "any"); break;
     case DDS_TS_SEQUENCE:
       {
-        dds_ts_ostream_emit(stream, "sequence<");
+        dds_ts_ostream_emit(ostream, "sequence<");
         dds_ts_sequence_t *sequence = (dds_ts_sequence_t*)type_spec;
-        emit_type_spec(sequence->element_type.type_spec, stream);
+        emit_type_spec(sequence->element_type.type_spec, ostream);
         if (sequence->bounded) {
-          dds_ts_ostream_emit(stream, ",");
-          dds_ts_ostream_emit_ull(stream, sequence->max);
+          dds_ts_ostream_emit(ostream, ",");
+          dds_ts_ostream_emit_ull(ostream, sequence->max);
         }
-        dds_ts_ostream_emit(stream, ">");
+        dds_ts_ostream_emit(ostream, ">");
       }
       break;
     case DDS_TS_STRING:
       {
-        dds_ts_ostream_emit(stream, "string");
+        dds_ts_ostream_emit(ostream, "string");
         dds_ts_string_t *string = (dds_ts_string_t*)type_spec;
         if (string->bounded) {
-          dds_ts_ostream_emit(stream, "<");
-          dds_ts_ostream_emit_ull(stream, string->max);
-          dds_ts_ostream_emit(stream, ">");
+          dds_ts_ostream_emit(ostream, "<");
+          dds_ts_ostream_emit_ull(ostream, string->max);
+          dds_ts_ostream_emit(ostream, ">");
         }
       }
       break;
     case DDS_TS_WIDE_STRING:
       {
-        dds_ts_ostream_emit(stream, "wstring");
+        dds_ts_ostream_emit(ostream, "wstring");
         dds_ts_string_t *string = (dds_ts_string_t*)type_spec;
         if (string->bounded) {
-          dds_ts_ostream_emit(stream, "<");
-          dds_ts_ostream_emit_ull(stream, string->max);
-          dds_ts_ostream_emit(stream, ">");
+          dds_ts_ostream_emit(ostream, "<");
+          dds_ts_ostream_emit_ull(ostream, string->max);
+          dds_ts_ostream_emit(ostream, ">");
         }
       }
       break;
     case DDS_TS_FIXED_PT:
       {
-        dds_ts_ostream_emit(stream, "fixed<");
+        dds_ts_ostream_emit(ostream, "fixed<");
         dds_ts_fixed_pt_t *fixedpt = (dds_ts_fixed_pt_t*)type_spec;
-        dds_ts_ostream_emit_ull(stream, fixedpt->digits);
-        dds_ts_ostream_emit(stream, ",");
-        dds_ts_ostream_emit_ull(stream, fixedpt->fraction_digits);
-        dds_ts_ostream_emit(stream, ">");
+        dds_ts_ostream_emit_ull(ostream, fixedpt->digits);
+        dds_ts_ostream_emit(ostream, ",");
+        dds_ts_ostream_emit_ull(ostream, fixedpt->fraction_digits);
+        dds_ts_ostream_emit(ostream, ">");
       }
       break;
     case DDS_TS_MAP:
       {
-        dds_ts_ostream_emit(stream, "map<");
+        dds_ts_ostream_emit(ostream, "map<");
         dds_ts_map_t *map = (dds_ts_map_t*)type_spec;
-        emit_type_spec(map->key_type.type_spec, stream);
-        dds_ts_ostream_emit(stream, ",");
-        emit_type_spec(map->value_type.type_spec, stream);
+        emit_type_spec(map->key_type.type_spec, ostream);
+        dds_ts_ostream_emit(ostream, ",");
+        emit_type_spec(map->value_type.type_spec, ostream);
         if (map->bounded) {
-          dds_ts_ostream_emit(stream, ",");
-          dds_ts_ostream_emit_ull(stream, map->max);
+          dds_ts_ostream_emit(ostream, ",");
+          dds_ts_ostream_emit_ull(ostream, map->max);
         }
-        dds_ts_ostream_emit(stream, ">");
+        dds_ts_ostream_emit(ostream, ">");
       }
       break;
     case DDS_TS_STRUCT:
       {
-        dds_ts_ostream_emit(stream, ((dds_ts_struct_t*)type_spec)->def.name);
+        dds_ts_ostream_emit(ostream, ((dds_ts_struct_t*)type_spec)->def.name);
       }
       break;
     default:
       {
-        dds_ts_ostream_emit(stream, "?");
-        dds_ts_ostream_emit_ull(stream, type_spec->node.flags);
-        dds_ts_ostream_emit(stream, "?");
+        dds_ts_ostream_emit(ostream, "?");
+        dds_ts_ostream_emit_ull(ostream, type_spec->node.flags);
+        dds_ts_ostream_emit(ostream, "?");
       }
       break;
   }
 }
 
-void dds_ts_walker_execute_expr(dds_ts_walker_t *walker, dds_ts_walker_expr_t *expr, dds_ts_exec_state_t *state, dds_ts_ostream_t *stream)
+
+static void dds_ts_walker_execute_expr(dds_ts_walker_t *walker, dds_ts_walker_expr_t *expr, dds_ts_walker_exec_state_t *state, void *context, dds_ts_ostream_t *ostream)
 {
   for (; expr != NULL; expr = expr->next) {
     switch(expr->type) {
+      case dds_ts_walker_expr_for_all_children:
+        for (dds_ts_node_t *node = state->node->children; node != NULL; node = node->next) {
+          dds_ts_walker_exec_state_t new_state;
+          new_state.node = node;
+          new_state.call_parent = state;
+          dds_ts_walker_execute_expr(walker, expr->sub1, &new_state, context, ostream);
+        }
+        break;
       case dds_ts_walker_expr_for_all_modules:
-        if (state->cur_node->flags == DDS_TS_MODULE) {
-          for (dds_ts_node_t *node = state->cur_node->children; node != NULL; node = node->next) {
+        if (state->node->flags == DDS_TS_MODULE) {
+          for (dds_ts_node_t *node = state->node->children; node != NULL; node = node->next) {
             if (node->flags == DDS_TS_MODULE) {
-              dds_ts_exec_state_t new_state = *state;
-              new_state.cur_node = node;
-              dds_ts_walker_execute_expr(walker, expr->sub1, &new_state, stream);
+              dds_ts_walker_exec_state_t new_state;
+              new_state.node = node;
+              new_state.call_parent = state;
+              dds_ts_walker_execute_expr(walker, expr->sub1, &new_state, context, ostream);
             }
           }
         }
         break;
       case dds_ts_walker_expr_for_all_structs:
-        if (state->cur_node->flags == DDS_TS_MODULE) {
-          for (dds_ts_node_t *node = state->cur_node->children; node != NULL; node = node->next) {
+        if (state->node->flags == DDS_TS_MODULE) {
+          for (dds_ts_node_t *node = state->node->children; node != NULL; node = node->next) {
             if (node->flags == DDS_TS_STRUCT) {
-              dds_ts_exec_state_t new_state = *state;
-              new_state.cur_node = node;
-              dds_ts_walker_execute_expr(walker, expr->sub1, &new_state, stream);
+              dds_ts_walker_exec_state_t new_state;
+              new_state.node = node;
+              new_state.call_parent = state;
+              dds_ts_walker_execute_expr(walker, expr->sub1, &new_state, context, ostream);
 	    }
 	  }
 	}
 	break;
       case dds_ts_walker_expr_for_all_members:
-        if (state->cur_node->flags == DDS_TS_STRUCT) {
-          dds_ts_exec_state_t new_state = *state;
-          for (new_state.cur_node = state->cur_node->children; new_state.cur_node != NULL; new_state.cur_node = new_state.cur_node->next) {
-	     dds_ts_walker_execute_expr(walker, expr->sub1, &new_state, stream);
+        if (state->node->flags == DDS_TS_STRUCT) {
+          for (dds_ts_node_t *node = state->node->children; node != NULL; node = node->next) {
+            if (node->flags == DDS_TS_STRUCT_MEMBER) {
+              dds_ts_walker_exec_state_t new_state;
+              new_state.node = node;
+              new_state.call_parent = state;
+	      dds_ts_walker_execute_expr(walker, expr->sub1, &new_state, context, ostream);
+            }
 	  }
 	}
 	break;
       case dds_ts_walker_expr_for_all_declarators:
-        if (state->cur_node->flags == DDS_TS_STRUCT_MEMBER) {
-          dds_ts_exec_state_t new_state = *state;
-          for (new_state.cur_node = state->cur_node->children; new_state.cur_node != NULL; new_state.cur_node = new_state.cur_node->next) {
-            dds_ts_walker_execute_expr(walker, expr->sub1, &new_state, stream);
+        if (state->node->flags == DDS_TS_STRUCT_MEMBER) {
+          for (dds_ts_node_t *node = state->node->children; node != NULL; node = node->next) {
+            dds_ts_walker_exec_state_t new_state;
+            new_state.node = node;
+            new_state.call_parent = state;
+            dds_ts_walker_execute_expr(walker, expr->sub1, &new_state, context, ostream);
           }
         }
         break;
-      case dds_ts_walker_expr_end_for:
+      case dds_ts_walker_expr_for_call_parent:
+        if (state->call_parent != NULL) {
+          dds_ts_walker_execute_expr(walker, expr->sub1, state->call_parent, context, ostream);
+        }
+        break;
+      case dds_ts_walker_expr_for_struct_member_type:
+        if (state->node->flags == DDS_TS_STRUCT_MEMBER) {
+          dds_ts_walker_exec_state_t new_state;
+          new_state.node = &((dds_ts_struct_member_t*)state->node)->member_type.type_spec->node;
+          new_state.call_parent = state;
+          dds_ts_walker_execute_expr(walker, expr->sub1, &new_state, context, ostream);
+        }
+        break;
+      case dds_ts_walker_expr_for_sequence_element_type:
+        if (state->node->flags == DDS_TS_SEQUENCE) {
+          dds_ts_walker_exec_state_t new_state;
+          new_state.node = &((dds_ts_sequence_t*)state->node)->element_type.type_spec->node;
+          new_state.call_parent = state;
+          dds_ts_walker_execute_expr(walker, expr->sub1, &new_state, context, ostream);
+        }
+        break;
+      case dds_ts_walker_expr_if_is_type:
+        if (state->node->flags == expr->flags) {
+          dds_ts_walker_execute_expr(walker, expr->sub1, state, context, ostream);
+        }
+        break;
+      case dds_ts_walker_expr_if_func:
+        if (expr->cond_func(state->node)) {
+          dds_ts_walker_execute_expr(walker, expr->sub1, state, context, ostream);
+        }
         break;
       case dds_ts_walker_expr_emit_type:
         {
           dds_ts_type_spec_t *type_spec = 0;
-          if (state->cur_node->flags == DDS_TS_STRUCT_MEMBER) {
-            type_spec = ((dds_ts_struct_member_t*)state->cur_node)->member_type.type_spec;
+          if (state->node->flags == DDS_TS_STRUCT_MEMBER) {
+            type_spec = ((dds_ts_struct_member_t*)state->node)->member_type.type_spec;
           }
           if (type_spec == 0) {
-            dds_ts_ostream_emit(stream, "??");
+            dds_ts_ostream_emit(ostream, "??");
           }
           else {
-            emit_type_spec(type_spec, stream);
+            emit_type_spec(type_spec, ostream);
           }
         }
         break;
       case dds_ts_walker_expr_emit_name:
-	if (DDS_TS_IS_DEFINITION(state->cur_node->flags)) {
-          dds_ts_ostream_emit(stream, ((dds_ts_definition_t*)state->cur_node)->name);
+	if (DDS_TS_IS_DEFINITION(state->node->flags)) {
+          dds_ts_ostream_emit(ostream, ((dds_ts_definition_t*)state->node)->name);
 	}
         else {
           char buffer[40];
-          os_ulltostr(state->cur_node->flags, buffer, 39, NULL);
-          dds_ts_ostream_emit(stream, "?");
-          dds_ts_ostream_emit(stream, buffer);
-          dds_ts_ostream_emit(stream, "?");
+          os_ulltostr(state->node->flags, buffer, 39, NULL);
+          dds_ts_ostream_emit(ostream, "?");
+          dds_ts_ostream_emit(ostream, buffer);
+          dds_ts_ostream_emit(ostream, "?");
         }
 	break;
       case dds_ts_walker_expr_emit:
-        dds_ts_ostream_emit(stream, expr->text);
+        dds_ts_ostream_emit(ostream, expr->text);
 	break;
       case dds_ts_walker_expr_end_def:
         break;
       case dds_ts_walker_expr_call_proc:
 	for (dds_ts_walker_proc_def_t *proc_def = walker->proc_defs; proc_def != NULL; proc_def = proc_def->next) {
           if (strcmp(proc_def->name, expr->text) == 0) {
-            dds_ts_walker_execute_expr(walker, proc_def->body, state, stream);
+            dds_ts_walker_execute_expr(walker, proc_def->body, state, context, ostream);
 	    break;
 	  }
 	}
         break;
+      case dds_ts_walker_expr_call_func:
+        expr->call_func(state, context, ostream);
     }
   }
 }
 
-void dds_ts_walker_execute(dds_ts_walker_t *walker, char *buffer, size_t len)
+extern void dds_ts_walker_execute(dds_ts_walker_t *walker, void *context, dds_ts_ostream_t *ostream)
 {
-  dds_ts_ostream_t stream;
-  dds_ts_ostream_init(&stream, buffer, len);
-  dds_ts_exec_state_t state;
-  state.cur_node = walker->root_node;
-  dds_ts_walker_execute_expr(walker, walker->main, &state, &stream);
+  dds_ts_walker_exec_state_t state;
+  state.node = walker->root_node;
+  dds_ts_walker_execute_expr(walker, walker->main, &state, context, ostream);
 }
 
 static void dds_ts_walker_expr_free(dds_ts_walker_expr_t *expr)
@@ -398,7 +498,7 @@ static void dds_ts_walker_expr_free(dds_ts_walker_expr_t *expr)
   }
 }
 
-void dds_ts_walker_free(dds_ts_walker_t *walker)
+extern void dds_ts_walker_free(dds_ts_walker_t *walker)
 {
   dds_ts_walker_proc_def_t *proc_def;
   for (proc_def = walker->proc_defs; proc_def != NULL;) {

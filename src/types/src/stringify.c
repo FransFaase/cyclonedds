@@ -12,11 +12,10 @@
 #include <stdio.h>
 #include <stdbool.h>
 
-#include "typetree.h"
-#include "type_walker.h"
+#include "stringify.h"
 
 
-extern void dds_ts_stringify(dds_ts_node_t *context, char *buffer, size_t len)
+extern void dds_ts_stringify(dds_ts_node_t *context, dds_ts_ostream_t *ostream)
 {
   dds_ts_walker_t *walker = dds_ts_create_walker(context);
 
@@ -52,7 +51,7 @@ extern void dds_ts_stringify(dds_ts_node_t *context, char *buffer, size_t len)
     dds_ts_walker_call_proc(walker, "module");
   dds_ts_walker_end(walker);
 
-  dds_ts_walker_execute(walker, buffer, len);
+  dds_ts_walker_execute(walker, NULL, ostream);
 
   dds_ts_walker_free(walker);
 }

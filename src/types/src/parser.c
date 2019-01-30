@@ -29,8 +29,40 @@ typedef void* yyscan_t;
 #include "idl.parser.h"
 #include "yy_decl.h"
 #include "idl.lexer.h"
+#include "stringify.h"
+#include "gen_ostream.h"
 
-extern void dds_ts_stringify(dds_ts_node_t *root_node, char *buffer, size_t len);
+/* file output stream */ 
+
+typedef struct {
+  dds_ts_ostream_t ostream;
+  FILE *f;
+} ostream_to_files_t;
+ 
+bool file_ostream_open(dds_ts_ostream_t *ostream, const char *name) 
+{ 
+OS_WARNING_MSVC_OFF(4996); 
+  return (((ostream_to_files_t*)ostream)->f = fopen(name, "wt")) != 0; 
+OS_WARNING_MSVC_ON(4996); 
+} 
+ 
+void file_ostream_close(dds_ts_ostream_t *ostream) 
+{ 
+  fclose(((ostream_to_files_t*)ostream)->f); 
+} 
+ 
+void file_ostream_put(dds_ts_ostream_t *ostream, char ch) 
+{ 
+  fputc(ch, ((ostream_to_files_t*)ostream)->f); 
+} 
+ 
+void init_ostream_to_files(ostream_to_files_t *ostream) 
+{ 
+  ostream->ostream.open = file_ostream_open; 
+  ostream->ostream.close = file_ostream_close; 
+  ostream->ostream.put = file_ostream_put; 
+} 
+
 
 extern int
 dds_ts_parse_file(const char *file, void (*error_func)(int line, int column, const char *msg))
@@ -64,7 +96,9 @@ OS_WARNING_MSVC_ON(4996);
     dds_ts_parser_set_in(fh, scanner);
     err = dds_ts_parser_parse(scanner, context);
     if (err == 0) {
-      dds_ts_generate_C99(file, dds_ts_context_get_root_node(context));
+      ostream_to_files_t ostream_to_files;
+      init_ostream_to_files(&ostream_to_files);
+      dds_ts_generate_C99(file, dds_ts_context_get_root_node(context), (dds_ts_ostream_t*)&ostream_to_files);
     }
     else if (dds_ts_context_get_out_of_memory_error(context)) {
       if (error_func != 0) {
@@ -150,7 +184,14 @@ int dds_ts_parse_string_stringify(const char *str, char *buffer, size_t len)
       buffer[len-1] = '\0';
     }
     else {
-      dds_ts_stringify(dds_ts_context_get_root_node(context), buffer, len);
+      dds_ts_ostream_t *ostream = NULL;
+      dds_ts_create_ostream_to_buffer(buffer, len, &ostream);
+      if (ostream == NULL) {
+        os_strlcpy(buffer, "OUT_OF_MEMORY", len);
+        return 2;
+      }
+      dds_ts_stringify(dds_ts_context_get_root_node(context), ostream);
+      os_free((void*)ostream);
     }
 
     dds_ts_free_context(context);
@@ -189,7 +230,14 @@ int dds_ts_parse_string_gen_C99(const char *str, char *buffer, size_t len)
       buffer[len-1] = '\0';
     }
     else {
-      dds_ts_generate_C99_to_buffer("test.idl", dds_ts_context_get_root_node(context), buffer, len);
+      dds_ts_ostream_t *ostream = NULL;
+      dds_ts_create_ostream_to_buffer(buffer, len, &ostream);
+      if (ostream == NULL) {
+        os_strlcpy(buffer, "OUT_OF_MEMORY", len);
+        return 2;
+      }
+      dds_ts_generate_C99("test.idl", dds_ts_context_get_root_node(context), ostream);
+      os_free((void*)ostream);
     }
 
     dds_ts_free_context(context);
