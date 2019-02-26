@@ -48,7 +48,7 @@ static struct ddsi_udp_config ddsi_udp_config_g;
 static struct ddsi_tran_factory ddsi_udp_factory_g;
 static os_atomic_uint32_t ddsi_udp_init_g = OS_ATOMIC_UINT32_INIT(0);
 
-static ssize_t ddsi_udp_conn_read (ddsi_tran_conn_t conn, unsigned char * buf, size_t len, nn_locator_t *srcloc)
+static ssize_t ddsi_udp_conn_read (ddsi_tran_conn_t conn, unsigned char * buf, size_t len, bool allow_spurious, nn_locator_t *srcloc)
 {
   int err;
   ssize_t ret;
@@ -56,6 +56,7 @@ static ssize_t ddsi_udp_conn_read (ddsi_tran_conn_t conn, unsigned char * buf, s
   os_sockaddr_storage src;
   os_iovec_t msg_iov;
   socklen_t srclen = (socklen_t) sizeof (src);
+  (void) allow_spurious;
 
   msg_iov.iov_base = (void*) buf;
   msg_iov.iov_len = (os_iov_len_t)len; /* Windows uses unsigned, POSIX (except Linux) int */
@@ -84,7 +85,7 @@ static ssize_t ddsi_udp_conn_read (ddsi_tran_conn_t conn, unsigned char * buf, s
 
     /* Check for udp packet truncation */
     if ((((size_t) ret) > len)
-#if SYSDEPS_MSGHDR_FLAGS
+#if OS_MSGHDR_FLAGS
         || (msghdr.msg_flags & MSG_TRUNC)
 #endif
         )
@@ -129,7 +130,7 @@ static ssize_t ddsi_udp_conn_write (ddsi_tran_conn_t conn, const nn_locator_t *d
   msg.msg_accrights = NULL;
   msg.msg_accrightslen = 0;
 #endif
-#if SYSDEPS_MSGHDR_FLAGS
+#if OS_MSGHDR_FLAGS
   msg.msg_flags = (int) flags;
 #else
   OS_UNUSED_ARG(flags);
@@ -273,7 +274,7 @@ static ddsi_tran_conn_t ddsi_udp_create_conn
     uc->m_base.m_write_fn = ddsi_udp_conn_write;
     uc->m_base.m_disable_multiplexing_fn = ddsi_udp_disable_multiplexing;
 
-    DDS_INFO
+    DDS_TRACE
     (
       "ddsi_udp_create_conn %s socket %"PRIsock" port %u\n",
       mcast ? "multicast" : "unicast",
@@ -396,7 +397,7 @@ static int ddsi_udp_leave_mc (ddsi_tran_conn_t conn, const nn_locator_t *srcloc,
 static void ddsi_udp_release_conn (ddsi_tran_conn_t conn)
 {
   ddsi_udp_conn_t uc = (ddsi_udp_conn_t) conn;
-  DDS_INFO
+  DDS_TRACE
   (
     "ddsi_udp_release_conn %s socket %"PRIsock" port %u\n",
     conn->m_base.m_multicast ? "multicast" : "unicast",
@@ -415,7 +416,7 @@ void ddsi_udp_fini (void)
     if(os_atomic_dec32_nv (&ddsi_udp_init_g) == 0) {
         free_group_membership(ddsi_udp_config_g.mship);
         memset (&ddsi_udp_factory_g, 0, sizeof (ddsi_udp_factory_g));
-        DDS_LOG(DDS_LC_INFO | DDS_LC_CONFIG, "udp finalized\n");
+        DDS_LOG(DDS_LC_CONFIG, "udp finalized\n");
     }
 }
 
@@ -505,7 +506,7 @@ static void ddsi_udp_deinit(void)
   if (os_atomic_dec32_nv(&ddsi_udp_init_g) == 0) {
     if (ddsi_udp_config_g.mship)
       free_group_membership(ddsi_udp_config_g.mship);
-    DDS_LOG(DDS_LC_INFO | DDS_LC_CONFIG, "udp de-initialized\n");
+    DDS_LOG(DDS_LC_CONFIG, "udp de-initialized\n");
   }
 }
 
@@ -550,7 +551,7 @@ int ddsi_udp_init (void)
 
     ddsi_factory_add (&ddsi_udp_factory_g);
 
-    DDS_LOG(DDS_LC_INFO | DDS_LC_CONFIG, "udp initialized\n");
+    DDS_LOG(DDS_LC_CONFIG, "udp initialized\n");
   }
   return 0;
 }

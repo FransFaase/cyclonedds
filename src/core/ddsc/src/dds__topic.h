@@ -13,16 +13,16 @@
 #define _DDS_TOPIC_H_
 
 #include "dds__types.h"
+#include "dds__entity.h"
 
 #if defined (__cplusplus)
 extern "C" {
 #endif
 
-#define dds_topic_lock(hdl, obj) dds_entity_lock(hdl, DDS_KIND_TOPIC, (dds_entity**)obj)
-#define dds_topic_unlock(obj)    dds_entity_unlock((dds_entity*)obj);
+DEFINE_ENTITY_LOCK_UNLOCK(inline, dds_topic, DDS_KIND_TOPIC)
 
-extern struct ddsi_sertopic * dds_topic_lookup (dds_domain * domain, const char * name);
-extern void dds_topic_free (dds_domainid_t domainid, struct ddsi_sertopic * st);
+DDS_EXPORT struct ddsi_sertopic * dds_topic_lookup (dds_domain * domain, const char * name);
+DDS_EXPORT void dds_topic_free (dds_domainid_t domainid, struct ddsi_sertopic * st);
 
 #ifndef DDS_TOPIC_INTERN_FILTER_FN_DEFINED
 #define DDS_TOPIC_INTERN_FILTER_FN_DEFINED

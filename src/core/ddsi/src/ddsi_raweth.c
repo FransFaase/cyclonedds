@@ -63,7 +63,7 @@ static char *ddsi_raweth_to_string (ddsi_tran_factory_t tran, char *dst, size_t 
   return dst;
 }
 
-static ssize_t ddsi_raweth_conn_read (ddsi_tran_conn_t conn, unsigned char * buf, size_t len, nn_locator_t *srcloc)
+static ssize_t ddsi_raweth_conn_read (ddsi_tran_conn_t conn, unsigned char * buf, size_t len, bool allow_spurious, nn_locator_t *srcloc)
 {
   int err;
   ssize_t ret;
@@ -71,6 +71,7 @@ static ssize_t ddsi_raweth_conn_read (ddsi_tran_conn_t conn, unsigned char * buf
   struct sockaddr_ll src;
   struct iovec msg_iov;
   socklen_t srclen = (socklen_t) sizeof (src);
+  (void) allow_spurious;
 
   msg_iov.iov_base = (void*) buf;
   msg_iov.iov_len = len;
@@ -99,7 +100,7 @@ static ssize_t ddsi_raweth_conn_read (ddsi_tran_conn_t conn, unsigned char * buf
 
     /* Check for udp packet truncation */
     if ((((size_t) ret) > len)
-#if SYSDEPS_MSGHDR_FLAGS
+#if OS_MSGHDR_FLAGS
         || (msghdr.msg_flags & MSG_TRUNC)
 #endif
         )
@@ -242,7 +243,7 @@ static ddsi_tran_conn_t ddsi_raweth_create_conn (uint32_t port, ddsi_tran_qos_t 
   uc->m_base.m_write_fn = ddsi_raweth_conn_write;
   uc->m_base.m_disable_multiplexing_fn = 0;
 
-  DDS_INFO("ddsi_raweth_create_conn %s socket %d port %u\n", mcast ? "multicast" : "unicast", uc->m_sock, uc->m_base.m_base.m_port);
+  DDS_TRACE("ddsi_raweth_create_conn %s socket %d port %u\n", mcast ? "multicast" : "unicast", uc->m_sock, uc->m_base.m_base.m_port);
   return uc ? &uc->m_base : NULL;
 }
 
@@ -294,7 +295,7 @@ static int ddsi_raweth_leave_mc (ddsi_tran_conn_t conn, const nn_locator_t *srcl
 static void ddsi_raweth_release_conn (ddsi_tran_conn_t conn)
 {
   ddsi_raweth_conn_t uc = (ddsi_raweth_conn_t) conn;
-  DDS_INFO
+  DDS_TRACE
   (
     "ddsi_raweth_release_conn %s socket %d port %d\n",
     conn->m_base.m_multicast ? "multicast" : "unicast",
@@ -310,6 +311,22 @@ static int ddsi_raweth_is_mcaddr (const ddsi_tran_factory_t tran, const nn_locat
   (void) tran;
   assert (loc->kind == NN_LOCATOR_KIND_RAWETH);
   return (loc->address[10] & 1);
+}
+
+static int ddsi_raweth_is_ssm_mcaddr (const ddsi_tran_factory_t tran, const nn_locator_t *loc)
+{
+  (void) tran;
+  (void) loc;
+  return 0;
+}
+
+static enum ddsi_nearby_address_result ddsi_raweth_is_nearby_address (ddsi_tran_factory_t tran, const nn_locator_t *loc, size_t ninterf, const struct nn_interface interf[])
+{
+  (void) tran;
+  (void) loc;
+  (void) ninterf;
+  (void) interf;
+  return DNAR_LOCAL;
 }
 
 static enum ddsi_locator_from_string_result ddsi_raweth_address_from_string (ddsi_tran_factory_t tran, nn_locator_t *loc, const char *str)
@@ -343,7 +360,7 @@ static void ddsi_raweth_deinit(void)
   if (os_atomic_dec32_nv(&init_g) == 0) {
     if (ddsi_raweth_config_g.mship)
       free_group_membership(ddsi_raweth_config_g.mship);
-    DDS_LOG(DDS_LC_INFO | DDS_LC_CONFIG, "raweth de-initialized\n");
+    DDS_LOG(DDS_LC_CONFIG, "raweth de-initialized\n");
   }
 }
 
@@ -371,7 +388,8 @@ int ddsi_raweth_init (void)
     ddsi_raweth_factory_g.m_join_mc_fn = ddsi_raweth_join_mc;
     ddsi_raweth_factory_g.m_leave_mc_fn = ddsi_raweth_leave_mc;
     ddsi_raweth_factory_g.m_is_mcaddr_fn = ddsi_raweth_is_mcaddr;
-    ddsi_raweth_factory_g.m_is_nearby_address_fn = ddsi_ipaddr_is_nearby_address;
+    ddsi_raweth_factory_g.m_is_ssm_mcaddr_fn = ddsi_raweth_is_ssm_mcaddr;
+    ddsi_raweth_factory_g.m_is_nearby_address_fn = ddsi_raweth_is_nearby_address;
     ddsi_raweth_factory_g.m_locator_from_string_fn = ddsi_raweth_address_from_string;
     ddsi_raweth_factory_g.m_locator_to_string_fn = ddsi_raweth_to_string;
     ddsi_raweth_factory_g.m_enumerate_interfaces_fn = ddsi_raweth_enumerate_interfaces;
@@ -379,7 +397,7 @@ int ddsi_raweth_init (void)
 
     ddsi_raweth_config_g.mship = new_group_membership();
 
-    DDS_LOG(DDS_LC_INFO | DDS_LC_CONFIG, "raweth initialized\n");
+    DDS_LOG(DDS_LC_CONFIG, "raweth initialized\n");
   }
   return 0;
 }

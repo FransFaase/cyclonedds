@@ -40,10 +40,8 @@ static const char * stream_op_type[11] =
 
 const uint32_t dds_op_size[5] = { 0, 1u, 2u, 4u, 8u };
 
-static void dds_stream_write
-  (dds_stream_t * os, const char * data, const uint32_t * ops);
-static void dds_stream_read
-  (dds_stream_t * is, char * data, const uint32_t * ops);
+static void dds_stream_write (dds_stream_t * os, const char * data, const uint32_t * ops);
+static void dds_stream_read (dds_stream_t * is, char * data, const uint32_t * ops);
 
 #define DDS_SWAP16(v) \
   ((uint16_t)(((v) >> 8) | ((v) << 8)))
@@ -165,7 +163,7 @@ size_t dds_stream_check_optimize (_In_ const dds_topic_descriptor_t * desc)
   dds_sample_free_contents (sample, desc->m_ops);
   dds_free (sample);
   dds_stream_fini (&os);
-  DDS_INFO("Marshalling for type: %s is%s optimised\n", desc->m_typename, size ? "" : " not");
+  DDS_TRACE("Marshalling for type: %s is%s optimised\n", desc->m_typename, size ? "" : " not");
   return size;
 }
 
@@ -258,6 +256,12 @@ uint64_t dds_stream_read_uint64 (dds_stream_t * is)
   return val;
 }
 
+extern inline char dds_stream_read_char (dds_stream_t *is);
+extern inline int8_t dds_stream_read_int8 (dds_stream_t *is);
+extern inline int16_t dds_stream_read_int16 (dds_stream_t *is);
+extern inline int32_t dds_stream_read_int32 (dds_stream_t *is);
+extern inline int64_t dds_stream_read_int64 (dds_stream_t *is);
+
 float dds_stream_read_float (dds_stream_t * is)
 {
   float val = 0.0;
@@ -299,7 +303,7 @@ char * dds_stream_reuse_string
       }
       else
       {
-        if ((str == NULL) || (strlen (str) < length))
+        if ((str == NULL) || (strlen (str) + 1 < length))
         {
           str = dds_realloc (str, length);
         }
@@ -416,6 +420,12 @@ void dds_stream_write_uint64 (dds_stream_t * os, uint64_t val)
 {
   DDS_OS_PUT8 (os, val, uint64_t);
 }
+
+extern inline void dds_stream_write_char (dds_stream_t * os, char val);
+extern inline void dds_stream_write_int8 (dds_stream_t * os, int8_t val);
+extern inline void dds_stream_write_int16 (dds_stream_t * os, int16_t val);
+extern inline void dds_stream_write_int32 (dds_stream_t * os, int32_t val);
+extern inline void dds_stream_write_int64 (dds_stream_t * os, int64_t val);
 
 void dds_stream_write_float (dds_stream_t * os, float val)
 {

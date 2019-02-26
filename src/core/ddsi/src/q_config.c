@@ -97,10 +97,10 @@ struct cfgst {
 
 /* "trace" is special: it enables (nearly) everything */
 static const char *logcat_names[] = {
-    "fatal", "error", "warning", "info", "config", "discovery", "data", "radmin", "timing", "traffic", "topic", "tcp", "plist", "whc", "throttle", "trace", NULL
+    "fatal", "error", "warning", "info", "config", "discovery", "data", "radmin", "timing", "traffic", "topic", "tcp", "plist", "whc", "throttle", "rhc", "trace", NULL
 };
 static const uint32_t logcat_codes[] = {
-    DDS_LC_FATAL, DDS_LC_ERROR, DDS_LC_WARNING, DDS_LC_INFO, DDS_LC_CONFIG, DDS_LC_DISCOVERY, DDS_LC_DATA, DDS_LC_RADMIN, DDS_LC_TIMING, DDS_LC_TRAFFIC, DDS_LC_TOPIC, DDS_LC_TCP, DDS_LC_PLIST, DDS_LC_WHC, DDS_LC_THROTTLE, DDS_LC_ALL
+    DDS_LC_FATAL, DDS_LC_ERROR, DDS_LC_WARNING, DDS_LC_INFO, DDS_LC_CONFIG, DDS_LC_DISCOVERY, DDS_LC_DATA, DDS_LC_RADMIN, DDS_LC_TIMING, DDS_LC_TRAFFIC, DDS_LC_TOPIC, DDS_LC_TCP, DDS_LC_PLIST, DDS_LC_WHC, DDS_LC_THROTTLE, DDS_LC_RHC, DDS_LC_ALL
 };
 
 /* We want the tracing/verbosity settings to be fixed while parsing
@@ -165,6 +165,9 @@ DUPF(durability_cdr);
 DUPF(transport_selector);
 DUPF(many_sockets_mode);
 DU(deaf_mute);
+#ifdef DDSI_INCLUDE_SSL
+DUPF(min_tls_version);
+#endif
 #undef DUPF
 #undef DU
 #undef PF
@@ -499,7 +502,7 @@ static const struct cfgelem heartbeat_interval_attrs[] = {
 };
 
 static const struct cfgelem liveliness_monitoring_attrs[] = {
-  { LEAF("StackTraces"), 1, "true", ABSOFF(noprogress_log_stacktraces), 0, uf_boolean, 0, pf_boolean,
+  { ATTR("StackTraces"), 1, "true", ABSOFF(noprogress_log_stacktraces), 0, uf_boolean, 0, pf_boolean,
     "<p>This element controls whether or not to write stack traces to the DDSI2 trace when a thread fails to make progress (on select platforms only).</p>" },
   END_MARKER
 };
@@ -679,7 +682,7 @@ static const struct cfgelem ssl_cfgelems[] = {
     "<p>This enables SSL/TLS for TCP.</p>" },
     { LEAF("CertificateVerification"), 1, "true", ABSOFF(ssl_verify), 0, uf_boolean, 0, pf_boolean,
     "<p>If disabled this allows SSL connections to occur even if an X509 certificate fails verification.</p>" },
-    { LEAF("VerifyClient"), 1, "false", ABSOFF(ssl_verify_client), 0, uf_boolean, 0, pf_boolean,
+    { LEAF("VerifyClient"), 1, "true", ABSOFF(ssl_verify_client), 0, uf_boolean, 0, pf_boolean,
     "<p>This enables an SSL server checking the X509 certificate of a connecting client.</p>" },
     { LEAF("SelfSignedCertificates"), 1, "false", ABSOFF(ssl_self_signed), 0, uf_boolean, 0, pf_boolean,
     "<p>This enables the use of self signed X509 certificates.</p>" },
@@ -691,6 +694,8 @@ static const struct cfgelem ssl_cfgelems[] = {
     "<p>The set of ciphers used by SSL/TLS</p>" },
     { LEAF("EntropyFile"), 1, "", ABSOFF(ssl_rand_file), 0, uf_string, ff_free, pf_string,
     "<p>The SSL/TLS random entropy file name.</p>" },
+    { LEAF("MinimumTLSVersion"), 1, "1.3", ABSOFF(ssl_min_version), 0, uf_min_tls_version, 0, pf_min_tls_version,
+    "<p>The minimum TLS version that may be negotiated, valid values are 1.2 and 1.3.</p>" },
     END_MARKER
 };
 #endif
@@ -1408,6 +1413,30 @@ static void pf_besmode(struct cfgst *cfgst, void *parent, struct cfgelem const *
     cfg_log(cfgst, "%s%s", str, is_default ? " [def]" : "");
 }
 
+#ifdef DDSI_INCLUDE_SSL
+static int uf_min_tls_version(struct cfgst *cfgst, UNUSED_ARG(void *parent), UNUSED_ARG(struct cfgelem const * const cfgelem), UNUSED_ARG(int first), const char *value)
+{
+  static const char *vs[] = {
+    "1.2", "1.3", NULL
+  };
+  static const struct ssl_min_version ms[] = {
+    {1,2}, {1,3}, {0,0}
+  };
+  int idx = list_index(vs, value);
+  struct ssl_min_version *elem = cfg_address(cfgst, parent, cfgelem);
+  assert(sizeof(vs) / sizeof(*vs) == sizeof(ms) / sizeof(*ms));
+  if ( idx < 0 )
+    return cfg_error(cfgst, "'%s': undefined value", value);
+  *elem = ms[idx];
+  return 1;
+}
+
+static void pf_min_tls_version(struct cfgst *cfgst, void *parent, struct cfgelem const * const cfgelem, int is_default)
+{
+  struct ssl_min_version *p = cfg_address(cfgst, parent, cfgelem);
+  cfg_log(cfgst, "%d.%d%s", p->major, p->minor, is_default ? " [def]" : "");
+}
+#endif
 
 static int uf_durability_cdr(struct cfgst *cfgst, UNUSED_ARG(void *parent), UNUSED_ARG(struct cfgelem const * const cfgelem), UNUSED_ARG(int first), const char *value)
 {
@@ -2851,7 +2880,7 @@ struct cfgst * config_init
                 case Q_CIPHER_NULL:
                     /* nop */
                     if ( s->key && strlen(s->key) > 0 ) {
-                        DDS_ERROR("config: DDSI2Service/Security/SecurityProfile[@cipherkey]: %s: cipher key not required\n", s->key);
+                        DDS_INFO("config: DDSI2Service/Security/SecurityProfile[@cipherkey]: %s: cipher key not required\n", s->key);
                     }
                     break;
 

@@ -29,7 +29,6 @@
 #include "ddsi/q_lat_estim.h"
 #include "ddsi/q_bitset.h"
 #include "ddsi/q_xevent.h"
-#include "ddsi/q_align.h"
 #include "ddsi/q_addrset.h"
 #include "ddsi/q_ddsi_discovery.h"
 #include "ddsi/q_radmin.h"
@@ -205,7 +204,7 @@ static int set_recvips (void)
 #endif
     else
     {
-      struct ospl_in_addr_node **recvnode = &gv.recvips;
+      struct config_in_addr_node **recvnode = &gv.recvips;
       int i, j;
       gv.recvips_mode = RECVIPS_MODE_SOME;
       for (i = 0; config.networkRecvAddressStrings[i] != NULL; i++)
@@ -226,7 +225,7 @@ static int set_recvips (void)
           DDS_ERROR("No interface bound to requested address '%s'\n", config.networkRecvAddressStrings[i]);
           return -1;
         }
-        *recvnode = os_malloc (sizeof (struct ospl_in_addr_node));
+        *recvnode = os_malloc (sizeof (struct config_in_addr_node));
         (*recvnode)->loc = loc;
         recvnode = &(*recvnode)->next;
         *recvnode = NULL;
@@ -455,7 +454,6 @@ int rtps_config_open (void)
     }
 
     dds_set_log_mask(config.enabled_logcats);
-    dds_set_log_file(config.tracingOutputFile);
     dds_set_trace_file(config.tracingOutputFile);
 
     return status;
@@ -488,7 +486,7 @@ int rtps_config_prep (struct cfgst *cfgst)
        inherited by readers/writers), but in many sockets mode each
        participant has its own socket, and therefore unique address
        set */
-    DDS_ERROR("Minimal built-in endpoint set mode and ManySocketsMode are incompatible\n");
+    DDS_ERROR ("Minimal built-in endpoint set mode and ManySocketsMode are incompatible\n");
     goto err_config_late_error;
   }
 
@@ -514,11 +512,11 @@ int rtps_config_prep (struct cfgst *cfgst)
     {
       double max = (double) config.auxiliary_bandwidth_limit * ((double) config.nack_delay / 1e9);
       if (max < 0)
-        DDS_FATAL("AuxiliaryBandwidthLimit * NackDelay = %g bytes is insane\n", max);
-      if (max > 2147483647.0)
-        config.max_queued_rexmit_bytes = 2147483647u;
-      else
-        config.max_queued_rexmit_bytes = (unsigned) max;
+      {
+        DDS_ERROR ("AuxiliaryBandwidthLimit * NackDelay = %g bytes is insane\n", max);
+        goto err_config_late_error;
+      }
+      config.max_queued_rexmit_bytes = max > 2147483647.0 ? 2147483647u : (unsigned) max;
     }
 #else
     config.max_queued_rexmit_bytes = 2147483647u;
@@ -528,7 +526,7 @@ int rtps_config_prep (struct cfgst *cfgst)
   /* Verify thread properties refer to defined threads */
   if (!check_thread_properties ())
   {
-    DDS_ERROR("Could not initialise configuration\n");
+    DDS_TRACE ("Could not initialise configuration\n");
     goto err_config_late_error;
   }
 
@@ -552,8 +550,7 @@ int rtps_config_prep (struct cfgst *cfgst)
 
       if (config.transport_selector != TRANS_UDP && chptr->diffserv_field != 0)
       {
-        DDS_ERROR("channel %s specifies IPv4 DiffServ settings which is incompatible with IPv6 use\n",
-                   chptr->name);
+        DDS_ERROR ("channel %s specifies IPv4 DiffServ settings which is incompatible with IPv6 use\n", chptr->name);
         error = 1;
       }
 
@@ -576,7 +573,7 @@ int rtps_config_prep (struct cfgst *cfgst)
    printed */
   if (! rtps_config_open ())
   {
-    DDS_ERROR("Could not initialise configuration\n");
+    DDS_TRACE ("Could not initialise configuration\n");
     goto err_config_late_error;
   }
 
@@ -587,8 +584,7 @@ int rtps_config_prep (struct cfgst *cfgst)
      if it had been created using create_thread(). */
 
   {
-  /* For Lite - Temporary
-    Thread states for each application thread is managed using thread_states structure
+  /* Temporary: thread states for each application thread is managed using thread_states structure
   */
 #define USER_MAX_THREADS 50
 
@@ -680,7 +676,7 @@ int create_multicast_sockets(void)
   gv.disc_conn_mc = disc;
   gv.data_conn_mc = data;
   DDS_TRACE("Multicast Ports: discovery %d data %d \n",
-          ddsi_tran_port (gv.disc_conn_mc), ddsi_tran_port (gv.data_conn_mc));
+          ddsi_conn_port (gv.disc_conn_mc), ddsi_conn_port (gv.data_conn_mc));
   return 1;
 
 err_data:
@@ -865,8 +861,7 @@ int rtps_init (void)
 {
   uint32_t port_disc_uc = 0;
   uint32_t port_data_uc = 0;
-
-  /* Initialize implementation (Lite or OSPL) */
+  bool mc_available = true;
 
   ddsi_plugin_init ();
   ddsi_iid_init ();
@@ -892,7 +887,7 @@ int rtps_init (void)
     tv.tv_sec = sec;
     tv.tv_nsec = usec * 1000;
     os_ctime_r (&tv, str, sizeof(str));
-    DDS_LOG(DDS_LC_INFO | DDS_LC_CONFIG, "started at %d.06%d -- %s\n", sec, usec, str);
+    DDS_LOG(DDS_LC_CONFIG, "started at %d.06%d -- %s\n", sec, usec, str);
   }
 
   /* Initialize thread pool */
@@ -941,7 +936,8 @@ int rtps_init (void)
 
   if (!find_own_ip (config.networkAddressString))
   {
-    DDS_ERROR("No network interface selected\n");
+    /* find_own_ip already logs a more informative error message */
+    DDS_LOG(DDS_LC_CONFIG, "No network interface selected\n");
     goto err_find_own_ip;
   }
   if (config.allowMulticast)
@@ -951,6 +947,11 @@ int rtps_init (void)
       DDS_WARNING("selected interface is not multicast-capable: disabling multicast\n");
       config.suppress_spdp_multicast = 1;
       config.allowMulticast = AMC_FALSE;
+      /* ensure discovery can work: firstly, that the process will be reachable on a "well-known" port
+         number, and secondly, that the local interface's IP address gets added to the discovery
+         address set */
+      config.participantIndex = PARTICIPANT_INDEX_AUTO;
+      mc_available = false;
     }
   }
   if (set_recvips () < 0)
@@ -1113,7 +1114,7 @@ int rtps_init (void)
   if (gv.m_factory->m_connless)
   {
     if (!(config.many_sockets_mode == MSM_NO_UNICAST && config.allowMulticast))
-      DDS_TRACE("Unicast Ports: discovery %d data %d\n", ddsi_tran_port (gv.disc_conn_uc), ddsi_tran_port (gv.data_conn_uc));
+      DDS_TRACE("Unicast Ports: discovery %d data %d\n", ddsi_conn_port (gv.disc_conn_uc), ddsi_conn_port (gv.data_conn_uc));
 
     if (config.allowMulticast)
     {
@@ -1128,11 +1129,11 @@ int rtps_init (void)
 
       /* Set multicast locators */
       if (!is_unspec_locator(&gv.loc_spdp_mc))
-        gv.loc_spdp_mc.port = ddsi_tran_port (gv.disc_conn_mc);
+        gv.loc_spdp_mc.port = ddsi_conn_port (gv.disc_conn_mc);
       if (!is_unspec_locator(&gv.loc_meta_mc))
-        gv.loc_meta_mc.port = ddsi_tran_port (gv.disc_conn_mc);
+        gv.loc_meta_mc.port = ddsi_conn_port (gv.disc_conn_mc);
       if (!is_unspec_locator(&gv.loc_default_mc))
-        gv.loc_default_mc.port = ddsi_tran_port (gv.data_conn_mc);
+        gv.loc_default_mc.port = ddsi_conn_port (gv.data_conn_mc);
 
       if (joinleave_spdp_defmcip (1) < 0)
         goto err_mc_conn;
@@ -1167,7 +1168,7 @@ int rtps_init (void)
   /* Create shared transmit connection */
 
   gv.tev_conn = gv.data_conn_uc;
-  DDS_TRACE("Timed event transmit port: %d\n", (int) ddsi_tran_port (gv.tev_conn));
+  DDS_TRACE("Timed event transmit port: %d\n", (int) ddsi_conn_port (gv.tev_conn));
 
 #ifdef DDSI_INCLUDE_NETWORK_CHANNELS
   {
@@ -1242,8 +1243,22 @@ int rtps_init (void)
 
   gv.as_disc = new_addrset ();
   add_to_addrset (gv.as_disc, &gv.loc_spdp_mc);
+  /* If multicast was enabled but not available, always add the local interface to the discovery address set.
+     Conversion via string and add_peer_addresses has the benefit that the port number expansion happens
+     automatically. */
+  if (!mc_available)
+  {
+    struct config_peer_listelem peer_local;
+    char local_addr[DDSI_LOCSTRLEN];
+    ddsi_locator_to_string_no_port (local_addr, sizeof (local_addr), &gv.interfaces[gv.selected_interface].loc);
+    peer_local.next = NULL;
+    peer_local.peer = local_addr;
+    add_peer_addresses (gv.as_disc, &peer_local);
+  }
   if (config.peers)
+  {
     add_peer_addresses (gv.as_disc, config.peers);
+  }
   if (config.peers_group)
   {
     gv.as_disc_group = new_addrset ();
@@ -1368,7 +1383,7 @@ err_network_partition_addrset:
 err_set_ext_address:
   while (gv.recvips)
   {
-    struct ospl_in_addr_node *n = gv.recvips;
+    struct config_in_addr_node *n = gv.recvips;
     gv.recvips = n->next;
     os_free (n);
   }
@@ -1481,7 +1496,6 @@ void rtps_stop (void)
   }
 
   {
-    const nn_vendorid_t ownvendorid = MY_VENDOR_ID;
     struct ephash_enum_writer est_wr;
     struct ephash_enum_reader est_rd;
     struct ephash_enum_participant est_pp;
@@ -1497,7 +1511,7 @@ void rtps_stop (void)
     ephash_enum_writer_init (&est_wr);
     while ((wr = ephash_enum_writer_next (&est_wr)) != NULL)
     {
-      if (!is_builtin_entityid (wr->e.guid.entityid, ownvendorid))
+      if (!is_builtin_entityid (wr->e.guid.entityid, NN_VENDORID_ECLIPSE))
         delete_writer_nolinger (&wr->e.guid);
     }
     ephash_enum_writer_fini (&est_wr);
@@ -1505,7 +1519,7 @@ void rtps_stop (void)
     ephash_enum_reader_init (&est_rd);
     while ((rd = ephash_enum_reader_next (&est_rd)) != NULL)
     {
-      if (!is_builtin_entityid (rd->e.guid.entityid, ownvendorid))
+      if (!is_builtin_entityid (rd->e.guid.entityid, NN_VENDORID_ECLIPSE))
         (void)delete_reader (&rd->e.guid);
     }
     ephash_enum_reader_fini (&est_rd);
@@ -1653,7 +1667,7 @@ void rtps_fini (void)
 
   while (gv.recvips)
   {
-    struct ospl_in_addr_node *n = gv.recvips;
+    struct config_in_addr_node *n = gv.recvips;
 /* The compiler doesn't realize that n->next is always initialized. */
 OS_WARNING_MSVC_OFF(6001);
     gv.recvips = n->next;

@@ -34,7 +34,6 @@
 #include "ddsi/q_log.h"
 #include "ddsi/q_unused.h"
 #include "ddsi/q_xmsg.h"
-#include "ddsi/q_align.h"
 #include "ddsi/q_config.h"
 #include "ddsi/q_entity.h"
 #include "ddsi/q_globals.h"
@@ -289,7 +288,6 @@ static void nn_xmsg_reinit (struct nn_xmsg *m, enum nn_xmsg_kind kind)
 
 static struct nn_xmsg *nn_xmsg_allocnew (struct nn_xmsgpool *pool, size_t expected_size, enum nn_xmsg_kind kind)
 {
-  const nn_vendorid_t myvendorid = MY_VENDOR_ID;
   struct nn_xmsg *m;
   struct nn_xmsg_data *d;
 
@@ -313,7 +311,7 @@ static struct nn_xmsg *nn_xmsg_allocnew (struct nn_xmsgpool *pool, size_t expect
   d->src.unused = 0;
   d->src.version.major = RTPS_MAJOR;
   d->src.version.minor = RTPS_MINOR;
-  d->src.vendorid = myvendorid;
+  d->src.vendorid = NN_VENDORID_ECLIPSE;
   d->dst.smhdr.submessageId = SMID_INFO_DST;
   d->dst.smhdr.flags = (PLATFORM_IS_LITTLE_ENDIAN ? SMFLAG_ENDIANNESS : 0);
   d->dst.smhdr.octetsToNextHeader = sizeof (d->dst.guid_prefix);
@@ -1240,7 +1238,6 @@ static void nn_xpack_reinit (struct nn_xpack *xp)
 
 struct nn_xpack * nn_xpack_new (ddsi_tran_conn_t conn, uint32_t bw_limit, bool async_mode)
 {
-  const nn_vendorid_t myvendorid = MY_VENDOR_ID;
   struct nn_xpack *xp;
 
   /* Disallow setting async_mode if not configured to enable async mode: this way we
@@ -1258,7 +1255,7 @@ struct nn_xpack * nn_xpack_new (ddsi_tran_conn_t conn, uint32_t bw_limit, bool a
   xp->hdr.protocol.id[3] = 'S';
   xp->hdr.version.major = RTPS_MAJOR;
   xp->hdr.version.minor = RTPS_MINOR;
-  xp->hdr.vendorid = myvendorid;
+  xp->hdr.vendorid = NN_VENDORID_ECLIPSE;
 
   /* MSG_LEN first sub message for stream based connections */
 
@@ -1339,7 +1336,18 @@ static ssize_t nn_xpack_send1 (const nn_locator_t *loc, void * varg)
 #endif
   {
     if (!gv.mute)
+    {
       nbytes = ddsi_conn_write (xp->conn, loc, xp->niov, xp->iov, xp->call_flags);
+#ifndef NDEBUG
+      {
+        size_t i, len;
+        for (i = 0, len = 0; i < xp->niov; i++) {
+          len += xp->iov[i].iov_len;
+        }
+        assert (nbytes == -1 || (size_t) nbytes == len);
+      }
+#endif
+    }
     else
     {
       DDS_TRACE("(dropped)");

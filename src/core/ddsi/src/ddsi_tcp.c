@@ -27,17 +27,13 @@
 #define INVALID_PORT (~0u)
 
 typedef struct ddsi_tran_factory * ddsi_tcp_factory_g_t;
+static os_atomic_uint32_t ddsi_tcp_init_g = OS_ATOMIC_UINT32_INIT(0);
 
 #ifdef DDSI_INCLUDE_SSL
-struct ddsi_ssl_plugins ddsi_tcp_ssl_plugin =
-  { NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL };
+static struct ddsi_ssl_plugins ddsi_tcp_ssl_plugin;
 #endif
 
 static const char * ddsi_name = "tcp";
-
-/* Stateless singleton instance handed out as client connection */
-
-static struct ddsi_tran_conn ddsi_tcp_conn_client;
 
 /*
   ddsi_tcp_conn: TCP connection for reading and writing. Mutex prevents concurrent
@@ -72,6 +68,10 @@ typedef struct ddsi_tcp_listener
 #endif
 }
 * ddsi_tcp_listener_t;
+
+/* Stateless singleton instance handed out as client connection */
+
+static struct ddsi_tcp_conn ddsi_tcp_conn_client;
 
 static int ddsi_tcp_cmp_conn (const struct ddsi_tcp_conn *c1, const struct ddsi_tcp_conn *c2)
 {
@@ -131,9 +131,9 @@ static void ddsi_tcp_cache_dump (void)
   while (n)
   {
     os_sockaddrAddressPortToString ((const os_sockaddr *) &n->m_conn->m_peer_addr, buff, sizeof (buff));
-    DDS_LOG
+    DDS_TRACE
     (
-      DDS_LC_INFO,
+      DDS_LC_TCP,
       "%s cache #%d: %s sock %d port %u peer %s\n",
       ddsi_name, i++, n->m_conn->m_base.m_server ? "server" : "client",
       n->m_conn->m_sock, n->m_conn->m_base.m_base.m_port, buff
@@ -168,7 +168,7 @@ static void ddsi_tcp_sock_free (os_socket sock, const char * msg)
   {
     if (msg)
     {
-      DDS_INFO("%s %s free socket %"PRIsock"\n", ddsi_name, msg, sock);
+      DDS_LOG(DDS_LC_TCP, "%s %s free socket %"PRIsock"\n", ddsi_name, msg, sock);
     }
     os_sockFree (sock);
   }
@@ -226,7 +226,7 @@ static void ddsi_tcp_conn_connect (ddsi_tcp_conn_t conn, const struct msghdr * m
 #endif
 
     sockaddr_to_string_with_port(buff, sizeof(buff), (os_sockaddr *) msg->msg_name);
-    DDS_INFO("%s connect socket %"PRIsock" port %u to %s\n", ddsi_name, sock, get_socket_port (sock), buff);
+    DDS_LOG(DDS_LC_TCP, "%s connect socket %"PRIsock" port %u to %s\n", ddsi_name, sock, get_socket_port (sock), buff);
 
     /* Also may need to receive on connection so add to waitset */
 
@@ -274,7 +274,7 @@ static void ddsi_tcp_cache_add (ddsi_tcp_conn_t conn, ut_avlIPath_t * path)
   }
 
   sockaddr_to_string_with_port(buff, sizeof(buff), (os_sockaddr *)&conn->m_peer_addr);
-  DDS_INFO("%s cache %s %s socket %"PRIsock" to %s\n", ddsi_name, action, conn->m_base.m_server ? "server" : "client", conn->m_sock, buff);
+  DDS_LOG(DDS_LC_TCP, "%s cache %s %s socket %"PRIsock" to %s\n", ddsi_name, action, conn->m_base.m_server ? "server" : "client", conn->m_sock, buff);
 }
 
 static void ddsi_tcp_cache_remove (ddsi_tcp_conn_t conn)
@@ -288,7 +288,7 @@ static void ddsi_tcp_cache_remove (ddsi_tcp_conn_t conn)
   if (node)
   {
     sockaddr_to_string_with_port(buff, sizeof(buff), (os_sockaddr *)&conn->m_peer_addr);
-    DDS_INFO("%s cache removed socket %"PRIsock" to %s\n", ddsi_name, conn->m_sock, buff);
+    DDS_LOG(DDS_LC_TCP, "%s cache removed socket %"PRIsock" to %s\n", ddsi_name, conn->m_sock, buff);
     ut_avlDeleteDPath (&ddsi_tcp_treedef, &ddsi_tcp_cache_g, node, &path);
     ddsi_tcp_node_free (node);
   }
@@ -347,7 +347,7 @@ OS_WARNING_MSVC_ON(4267);
 }
 
 #ifdef DDSI_INCLUDE_SSL
-static os_ssize_t ddsi_tcp_conn_read_ssl (ddsi_tcp_conn_t tcp, void * buf, os_size_t len, int * err)
+static ssize_t ddsi_tcp_conn_read_ssl (ddsi_tcp_conn_t tcp, void * buf, size_t len, int * err)
 {
   return (ddsi_tcp_ssl_plugin.read) (tcp->m_ssl, buf, len, err);
 }
@@ -395,7 +395,7 @@ static int err_is_AGAIN_or_WOULDBLOCK (int err)
   return 0;
 }
 
-static ssize_t ddsi_tcp_conn_read (ddsi_tran_conn_t conn, unsigned char * buf, size_t len, nn_locator_t *srcloc)
+static ssize_t ddsi_tcp_conn_read (ddsi_tran_conn_t conn, unsigned char * buf, size_t len, bool allow_spurious, nn_locator_t *srcloc)
 {
   ddsi_tcp_conn_t tcp = (ddsi_tcp_conn_t) conn;
   ssize_t (*rd) (ddsi_tcp_conn_t, void *, size_t, int * err) = ddsi_tcp_conn_read_plain;
@@ -436,10 +436,10 @@ static ssize_t ddsi_tcp_conn_read (ddsi_tran_conn_t conn, unsigned char * buf, s
       {
         if (err_is_AGAIN_or_WOULDBLOCK (err))
         {
-          if (ddsi_tcp_select (tcp->m_sock, true, pos) == false)
-          {
+          if (allow_spurious && pos == 0)
+            return 0;
+          else if (ddsi_tcp_select (tcp->m_sock, true, pos) == false)
             break;
-          }
         }
         else
         {
@@ -470,7 +470,7 @@ OS_WARNING_MSVC_OFF(4267);
 }
 
 #ifdef DDSI_INCLUDE_SSL
-static os_ssize_t ddsi_tcp_conn_write_ssl (ddsi_tcp_conn_t conn, const void * buf, os_size_t len, int * err)
+static ssize_t ddsi_tcp_conn_write_ssl (ddsi_tcp_conn_t conn, const void * buf, size_t len, int * err)
 {
   return (ddsi_tcp_ssl_plugin.write) (conn->m_ssl, buf, len, err);
 }
@@ -540,7 +540,7 @@ static ssize_t ddsi_tcp_conn_write (ddsi_tran_conn_t base, const nn_locator_t *d
 {
 #ifdef DDSI_INCLUDE_SSL
   char msgbuf[4096]; /* stack buffer for merging smallish writes without requiring allocations */
-  struct iovec iovec; /* iovec used for msgbuf */
+  os_iovec_t iovec; /* iovec used for msgbuf */
 #endif
   ssize_t ret;
   size_t len;
@@ -555,7 +555,7 @@ static ssize_t ddsi_tcp_conn_write (ddsi_tran_conn_t base, const nn_locator_t *d
   set_msghdr_iov (&msg, (os_iovec_t *) iov, niov);
   msg.msg_name = &dstaddr;
   msg.msg_namelen = (socklen_t) os_sockaddr_get_size((os_sockaddr *) &dstaddr);
-#if SYSDEPS_MSGHDR_FLAGS
+#if OS_MSGHDR_FLAGS
   msg.msg_flags = (int) flags;
 #endif
   len = iovlen_sum (niov, iov);
@@ -602,7 +602,7 @@ static ssize_t ddsi_tcp_conn_write (ddsi_tran_conn_t base, const nn_locator_t *d
     {
       int i;
       char * ptr;
-      iovec.iov_len = len;
+      iovec.iov_len = (os_iov_len_t) len;
       iovec.iov_base = (len <= sizeof (msgbuf)) ? msgbuf : os_malloc (len);
       ptr = iovec.iov_base;
       for (i = 0; i < (int) msg.msg_iovlen; i++)
@@ -642,20 +642,18 @@ static ssize_t ddsi_tcp_conn_write (ddsi_tran_conn_t base, const nn_locator_t *d
       else
       {
         piecewise = 0;
-        if (err != os_sockECONNRESET)
+        switch (err)
         {
-          if (! conn->m_base.m_closed && (conn->m_sock != OS_INVALID_SOCKET))
-          {
-            DDS_WARNING
-            (
-              "%s write failed on socket %"PRIsock" with errno %d\n",
-              ddsi_name, conn->m_sock, err
-            );
-          }
-        }
-        else
-        {
-          DDS_LOG(DDS_LC_TCP, "%s write: sock %"PRIsock" ECONNRESET\n", ddsi_name, conn->m_sock);
+          case os_sockECONNRESET:
+#ifdef os_sockEPIPE
+          case os_sockEPIPE:
+#endif
+            DDS_LOG(DDS_LC_TCP, "%s write: sock %"PRIsock" ECONNRESET\n", ddsi_name, conn->m_sock);
+            break;
+          default:
+            if (! conn->m_base.m_closed && (conn->m_sock != OS_INVALID_SOCKET))
+              DDS_WARNING("%s write failed on socket %"PRIsock" with errno %d\n", ddsi_name, conn->m_sock, err);
+            break;
         }
       }
     }
@@ -733,8 +731,7 @@ static ddsi_tran_conn_t ddsi_tcp_create_conn (uint32_t port, ddsi_tran_qos_t qos
 {
   (void) qos;
   (void) port;
-
-  return (ddsi_tran_conn_t) &ddsi_tcp_conn_client;
+  return &ddsi_tcp_conn_client.m_base;
 }
 
 static int ddsi_tcp_listen (ddsi_tran_listener_t listener)
@@ -801,7 +798,7 @@ static ddsi_tran_conn_t ddsi_tcp_accept (ddsi_tran_listener_t listener)
   else
   {
     sockaddr_to_string_with_port(buff, sizeof(buff), (os_sockaddr *)&addr);
-    DDS_INFO("%s accept new socket %"PRIsock" on socket %"PRIsock" from %s\n", ddsi_name, sock, tl->m_sock, buff);
+    DDS_LOG(DDS_LC_TCP, "%s accept new socket %"PRIsock" on socket %"PRIsock" from %s\n", ddsi_name, sock, tl->m_sock, buff);
 
     os_sockSetNonBlocking (sock, true);
     tcp = ddsi_tcp_new_conn (sock, true, (os_sockaddr *)&addr);
@@ -909,7 +906,7 @@ static ddsi_tran_listener_t ddsi_tcp_create_listener (int port, ddsi_tran_qos_t 
     }
 
     sockaddr_to_string_with_port(buff, sizeof(buff), (os_sockaddr *)&addr);
-    DDS_INFO("%s create listener socket %"PRIsock" on %s\n", ddsi_name, sock, buff);
+    DDS_LOG(DDS_LC_TCP, "%s create listener socket %"PRIsock" on %s\n", ddsi_name, sock, buff);
   }
 
   return tl ? &tl->m_base : NULL;
@@ -919,7 +916,7 @@ static void ddsi_tcp_conn_delete (ddsi_tcp_conn_t conn)
 {
   char buff[DDSI_LOCSTRLEN];
   sockaddr_to_string_with_port(buff, sizeof(buff), (os_sockaddr *)&conn->m_peer_addr);
-  DDS_INFO("%s free %s connnection on socket %"PRIsock" to %s\n", ddsi_name, conn->m_base.m_server ? "server" : "client", conn->m_sock, buff);
+  DDS_LOG(DDS_LC_TCP, "%s free %s connnection on socket %"PRIsock" to %s\n", ddsi_name, conn->m_base.m_server ? "server" : "client", conn->m_sock, buff);
 
 #ifdef DDSI_INCLUDE_SSL
   if (ddsi_tcp_ssl_plugin.ssl_free)
@@ -937,13 +934,13 @@ static void ddsi_tcp_conn_delete (ddsi_tcp_conn_t conn)
 
 static void ddsi_tcp_close_conn (ddsi_tran_conn_t tc)
 {
-  if (tc != (ddsi_tran_conn_t) &ddsi_tcp_conn_client)
+  if (tc != &ddsi_tcp_conn_client.m_base)
   {
     char buff[DDSI_LOCSTRLEN];
     nn_locator_t loc;
     ddsi_tcp_conn_t conn = (ddsi_tcp_conn_t) tc;
     sockaddr_to_string_with_port(buff, sizeof(buff), (os_sockaddr *)&conn->m_peer_addr);
-    DDS_INFO("%s close %s connnection on socket %"PRIsock" to %s\n", ddsi_name, conn->m_base.m_server ? "server" : "client", conn->m_sock, buff);
+    DDS_LOG(DDS_LC_TCP, "%s close %s connnection on socket %"PRIsock" to %s\n", ddsi_name, conn->m_base.m_server ? "server" : "client", conn->m_sock, buff);
     (void) shutdown (conn->m_sock, 2);
     ddsi_ipaddr_to_loc(&loc, (os_sockaddr *)&conn->m_peer_addr, conn->m_peer_addr.ss_family == AF_INET ? NN_LOCATOR_KIND_TCPv4 : NN_LOCATOR_KIND_TCPv6);
     loc.port = conn->m_peer_port;
@@ -953,7 +950,7 @@ static void ddsi_tcp_close_conn (ddsi_tran_conn_t tc)
 
 static void ddsi_tcp_release_conn (ddsi_tran_conn_t conn)
 {
-  if (conn != (ddsi_tran_conn_t) &ddsi_tcp_conn_client)
+  if (conn != &ddsi_tcp_conn_client.m_base)
   {
     ddsi_tcp_conn_delete ((ddsi_tcp_conn_t) conn);
   }
@@ -964,13 +961,6 @@ static void ddsi_tcp_unblock_listener (ddsi_tran_listener_t listener)
   ddsi_tcp_listener_t tl = (ddsi_tcp_listener_t) listener;
   os_socket sock;
   int ret;
-
-#ifdef DDSI_INCLUDE_SSL
-  if (ddsi_tcp_ssl_plugin.bio_vfree)
-  {
-    (ddsi_tcp_ssl_plugin.bio_vfree) (tl->m_bio);
-  }
-#endif
 
   /* Connect to own listener socket to wake listener from blocking 'accept()' */
   ddsi_tcp_sock_new (&sock, 0);
@@ -1021,20 +1011,29 @@ static void ddsi_tcp_unblock_listener (ddsi_tran_listener_t listener)
 static void ddsi_tcp_release_listener (ddsi_tran_listener_t listener)
 {
   ddsi_tcp_listener_t tl = (ddsi_tcp_listener_t) listener;
+#ifdef DDSI_INCLUDE_SSL
+  if (ddsi_tcp_ssl_plugin.bio_vfree)
+  {
+    (ddsi_tcp_ssl_plugin.bio_vfree) (tl->m_bio);
+  }
+#endif
   ddsi_tcp_sock_free (tl->m_sock, "listener");
   os_free (tl);
 }
 
 static void ddsi_tcp_release_factory (void)
 {
-  ut_avlFree (&ddsi_tcp_treedef, &ddsi_tcp_cache_g, ddsi_tcp_node_free);
-  os_mutexDestroy (&ddsi_tcp_cache_lock_g);
+  if (os_atomic_dec32_nv (&ddsi_tcp_init_g) == 0) {
+    ut_avlFree (&ddsi_tcp_treedef, &ddsi_tcp_cache_g, ddsi_tcp_node_free);
+    os_mutexDestroy (&ddsi_tcp_cache_lock_g);
 #ifdef DDSI_INCLUDE_SSL
-  if (ddsi_tcp_ssl_plugin.fini)
-  {
-    (ddsi_tcp_ssl_plugin.fini) ();
-  }
+    if (ddsi_tcp_ssl_plugin.fini)
+    {
+      (ddsi_tcp_ssl_plugin.fini) ();
+    }
 #endif
+    DDS_LOG(DDS_LC_CONFIG, "tcp de-initialized\n");
+  }
 }
 
 static enum ddsi_locator_from_string_result ddsi_tcp_address_from_string (ddsi_tran_factory_t tran, nn_locator_t *loc, const char *str)
@@ -1042,12 +1041,30 @@ static enum ddsi_locator_from_string_result ddsi_tcp_address_from_string (ddsi_t
   return ddsi_ipaddr_from_string(tran, loc, str, ddsi_tcp_factory_g.m_kind);
 }
 
+static int ddsi_tcp_is_mcaddr (const ddsi_tran_factory_t tran, const nn_locator_t *loc)
+{
+  (void) tran;
+  (void) loc;
+  return 0;
+}
+
+static int ddsi_tcp_is_ssm_mcaddr (const ddsi_tran_factory_t tran, const nn_locator_t *loc)
+{
+  (void) tran;
+  (void) loc;
+  return 0;
+}
+
+static enum ddsi_nearby_address_result ddsi_tcp_is_nearby_address (ddsi_tran_factory_t tran, const nn_locator_t *loc, size_t ninterf, const struct nn_interface interf[])
+{
+  return ddsi_ipaddr_is_nearby_address(tran, loc, ninterf, interf);
+}
+
 int ddsi_tcp_init (void)
 {
-  static bool init = false;
-  if (!init)
+  if (os_atomic_inc32_nv (&ddsi_tcp_init_g) == 1)
   {
-    init = true;
+    memset (&ddsi_tcp_factory_g, 0, sizeof (ddsi_tcp_factory_g));
     ddsi_tcp_factory_g.m_kind = NN_LOCATOR_KIND_TCPv4;
     ddsi_tcp_factory_g.m_typename = "tcp";
     ddsi_tcp_factory_g.m_stream = true;
@@ -1063,6 +1080,9 @@ int ddsi_tcp_init (void)
     ddsi_tcp_factory_g.m_locator_from_string_fn = ddsi_tcp_address_from_string;
     ddsi_tcp_factory_g.m_locator_to_string_fn = ddsi_ipaddr_to_string;
     ddsi_tcp_factory_g.m_enumerate_interfaces_fn = ddsi_eth_enumerate_interfaces;
+    ddsi_tcp_factory_g.m_is_mcaddr_fn = ddsi_tcp_is_mcaddr;
+    ddsi_tcp_factory_g.m_is_ssm_mcaddr_fn = ddsi_tcp_is_ssm_mcaddr;
+    ddsi_tcp_factory_g.m_is_nearby_address_fn = ddsi_tcp_is_nearby_address;
     ddsi_factory_add (&ddsi_tcp_factory_g);
 
 #if OS_SOCKET_HAS_IPV6
@@ -1074,17 +1094,14 @@ int ddsi_tcp_init (void)
 #endif
 
     memset (&ddsi_tcp_conn_client, 0, sizeof (ddsi_tcp_conn_client));
-    ddsi_tcp_base_init (&ddsi_tcp_conn_client);
+    ddsi_tcp_base_init (&ddsi_tcp_conn_client.m_base);
 
 #ifdef DDSI_INCLUDE_SSL
-    if (ddsi_tcp_ssl_plugin.config)
-    {
-      (ddsi_tcp_ssl_plugin.config) ();
-    }
-    if (ddsi_tcp_ssl_plugin.init)
+    if (config.ssl_enable)
     {
       ddsi_name = "tcp/ssl";
-      if (! (ddsi_tcp_ssl_plugin.init) ())
+      ddsi_ssl_config_plugin (&ddsi_tcp_ssl_plugin);
+      if (! ddsi_tcp_ssl_plugin.init ())
       {
         DDS_ERROR("Failed to initialize OpenSSL\n");
         return -1;
