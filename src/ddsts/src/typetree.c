@@ -14,289 +14,238 @@
 #include <assert.h>
 #include "os/os.h"
 
-/* ddsts_node_t */
 
-extern void ddsts_free_node(ddsts_node_t *node)
+void ddsts_free_type(ddsts_type_t *type)
 {
-  if (node != NULL) {
-    node->free_func(node);
+  if (type != NULL) {
+    type->type.free_func(type);
   }
 }
 
-static void init_node(ddsts_node_t *node, void (*free_func)(ddsts_node_t*), ddsts_node_flags_t flags)
+static void set_type_ref(ddsts_type_t **ref_type, ddsts_type_t *type, ddsts_type_t *parent)
 {
-  node->free_func = free_func;
-  node->flags = flags;
-  node->parent = NULL;
-  node->children = NULL;
-  node->next = NULL;
-}
-
-static void free_node(ddsts_node_t *node)
-{
-  ddsts_node_t *child;
-  for (child = node->children; child != NULL;) {
-    ddsts_node_t *next = child->next;
-    ddsts_free_node(child);
-    child = next;
+  *ref_type = type;
+  if (type != NULL && type->type.parent == NULL) {
+    type->type.parent = parent;
   }
-  os_free((void*)node);
 }
 
-/* ddsts_type_spec_t (is abstract) */
-
-static void init_type_spec(ddsts_type_spec_t *type_spec, void (*free_func)(ddsts_node_t*), ddsts_node_flags_t flags)
+static void free_type_ref(ddsts_type_t *type, ddsts_type_t *parent)
 {
-  init_node(&type_spec->node, free_func, flags);
+  if (type != NULL && type->type.parent == parent) {
+    ddsts_free_type(type);
+  }
 }
 
-static void free_type_spec(ddsts_type_spec_t *type_spec)
+static void free_children(ddsts_type_t *type)
 {
-  free_node(&type_spec->node);
+  while (type != NULL) {
+    ddsts_type_t *next = type->type.next;
+    ddsts_free_type(type);
+    type = next;
+  }
 }
 
-/* ddsts_type_spec_ptr_t */
-
-void ddsts_type_spec_ptr_assign(ddsts_type_spec_ptr_t *type_spec_ptr, ddsts_type_spec_t *type_spec)
+static void init_type(ddsts_type_t *type, void (*free_func)(ddsts_type_t*), ddsts_flags_t flags, ddsts_identifier_t name)
 {
-  type_spec_ptr->type_spec = type_spec;
-  type_spec_ptr->is_reference = false;
+  type->type.flags = flags;
+  type->type.name = name;
+  type->type.parent = NULL;
+  type->type.next = NULL;
+  type->type.free_func = free_func;
 }
 
-void ddsts_type_spec_ptr_assign_reference(ddsts_type_spec_ptr_t *type_spec_ptr, ddsts_type_spec_t *type_spec)
+static void free_type(ddsts_type_t *type)
 {
-  type_spec_ptr->type_spec = type_spec;
-  type_spec_ptr->is_reference = true;
+  os_free((void*)type->type.name);
+  os_free((void*)type);
 }
 
 /* ddsts_base_type_t */
 
-static void init_base_type(ddsts_base_type_t *base_type, void (*free_func)(ddsts_node_t*), ddsts_node_flags_t flags)
+ddsts_type_t *ddsts_create_base_type(ddsts_flags_t flags)
 {
-  init_type_spec(&base_type->type_spec, free_func, flags);
-}
-
-static void free_base_type(ddsts_node_t *node)
-{
-  free_type_spec(&((ddsts_base_type_t*)node)->type_spec);
-}
-
-extern ddsts_base_type_t *ddsts_create_base_type(ddsts_node_flags_t flags)
-{
-  ddsts_base_type_t *base_type = (ddsts_base_type_t*)os_malloc(sizeof(ddsts_base_type_t));
-  if (base_type == NULL) {
+  ddsts_type_t *type = (ddsts_type_t*)os_malloc(sizeof(ddsts_base_type_t));
+  if (type == NULL) {
     return NULL;
   }
-  init_base_type(base_type, free_base_type, flags);
-  return base_type;
-}
-
-/* ddsts_type_spec_ptr_t */
-
-static void free_type_spec_ptr(ddsts_type_spec_ptr_t* type_spec_ptr)
-{
-  if (!type_spec_ptr->is_reference) {
-    ddsts_free_node(&type_spec_ptr->type_spec->node);
-  }
+  init_type(type, free_type, flags, NULL);
+  return type;
 }
 
 /* ddsts_sequence_t */
 
-static void free_sequence(ddsts_node_t *node)
+static void free_sequence(ddsts_type_t *type)
 {
-  free_type_spec_ptr(&((ddsts_sequence_t*)node)->element_type);
-  free_type_spec(&((ddsts_sequence_t*)node)->type_spec);
+  free_type_ref(type->sequence.element_type, type);
+  free_type(type);
 }
 
-extern ddsts_sequence_t *ddsts_create_sequence(ddsts_type_spec_ptr_t* element_type, bool bounded, unsigned long long max)
+ddsts_type_t *ddsts_create_sequence(ddsts_type_t* element_type, unsigned long long max)
 {
-  ddsts_sequence_t *sequence = (ddsts_sequence_t*)os_malloc(sizeof(ddsts_sequence_t));
-  if (sequence == NULL) {
+  ddsts_type_t *type = (ddsts_type_t*)os_malloc(sizeof(ddsts_sequence_t));
+  if (type == NULL) {
     return NULL;
   }
-  init_type_spec(&sequence->type_spec, free_sequence, DDSTS_SEQUENCE);
-  sequence->element_type = *element_type;
-  sequence->bounded = bounded;
-  sequence->max = max;
-  return sequence;
+  init_type(type, free_sequence, DDSTS_SEQUENCE, NULL);
+  set_type_ref(&type->sequence.element_type, element_type, type);
+  type->sequence.max = max;
+  return type;
+}
+
+/* ddsts_array_t */
+
+static void free_array(ddsts_type_t *type)
+{
+  free_type_ref(type->array.element_type, type);
+  free_type(type);
+}
+
+ddsts_type_t *ddsts_create_array(ddsts_type_t* element_type, unsigned long long size)
+{
+  ddsts_type_t *type = (ddsts_type_t*)os_malloc(sizeof(ddsts_array_t));
+  if (type == NULL) {
+    return NULL;
+  }
+  init_type(type, free_array, DDSTS_SEQUENCE, NULL);
+  set_type_ref(&type->array.element_type, element_type, type);
+  type->array.size = size;
+  return type;
 }
 
 /* ddsts_string_t */
 
-static void free_string(ddsts_node_t *node)
+static void free_string(ddsts_type_t *type)
 {
-  free_type_spec(&((ddsts_string_t*)node)->type_spec);
+  free_type(type);
 }
 
-extern ddsts_string_t *ddsts_create_string(ddsts_node_flags_t flags, bool bounded, unsigned long long max)
+ddsts_type_t *ddsts_create_string(ddsts_flags_t flags, unsigned long long max)
 {
-  ddsts_string_t *string = (ddsts_string_t*)os_malloc(sizeof(ddsts_string_t));
-  if (string == NULL) {
+  ddsts_type_t *type = (ddsts_type_t*)os_malloc(sizeof(ddsts_string_t));
+  if (type == NULL) {
     return NULL;
   }
-  init_type_spec(&string->type_spec, free_string, flags);
-  string->bounded = bounded;
-  string->max = max;
-  return string;
+  init_type(type, free_string, flags, NULL);
+  type->string.max = max;
+  return type;
 }
 
 /* ddsts_fixed_pt_t */
 
-static void free_fixed_pt(ddsts_node_t *node)
+static void free_fixed_pt(ddsts_type_t *type)
 {
-  free_type_spec(&((ddsts_fixed_pt_t*)node)->type_spec);
+  free_type(type);
 }
 
-extern ddsts_fixed_pt_t *ddsts_create_fixed_pt(unsigned long long digits, unsigned long long fraction_digits)
+ddsts_type_t *ddsts_create_fixed_pt(unsigned long long digits, unsigned long long fraction_digits)
 {
-  ddsts_fixed_pt_t *fixed_pt = (ddsts_fixed_pt_t*)os_malloc(sizeof(ddsts_fixed_pt_t));
-  if (fixed_pt == NULL) {
+  ddsts_type_t *type = (ddsts_type_t*)os_malloc(sizeof(ddsts_fixed_pt_t));
+  if (type == NULL) {
     return NULL;
   }
-  init_type_spec(&fixed_pt->type_spec, free_fixed_pt, DDSTS_FIXED_PT);
-  fixed_pt->digits = digits;
-  fixed_pt->fraction_digits = fraction_digits;
-  return fixed_pt;
+  init_type(type, free_fixed_pt, DDSTS_FIXED_PT, NULL);
+  type->fixed_pt.digits = digits;
+  type->fixed_pt.fraction_digits = fraction_digits;
+  return type;
 }
 
 /* ddsts_map_t */
 
-static void free_map(ddsts_node_t *node)
+static void free_map(ddsts_type_t *type)
 {
-  free_type_spec_ptr(&((ddsts_map_t*)node)->key_type);
-  free_type_spec_ptr(&((ddsts_map_t*)node)->value_type);
-  free_type_spec(&((ddsts_map_t*)node)->type_spec);
+  free_type_ref(type->map.key_type, type);
+  free_type_ref(type->map.value_type, type);
+  free_type(type);
 }
 
-extern ddsts_map_t *ddsts_create_map(ddsts_type_spec_ptr_t *key_type, ddsts_type_spec_ptr_t *value_type, bool bounded, unsigned long long max)
+ddsts_type_t *ddsts_create_map(ddsts_type_t *key_type, ddsts_type_t *value_type, unsigned long long max)
 {
-  ddsts_map_t *map = (ddsts_map_t*)os_malloc(sizeof(ddsts_map_t));
-  if (map == NULL) {
+  ddsts_type_t *type = (ddsts_type_t*)os_malloc(sizeof(ddsts_map_t));
+  if (type == NULL) {
     return NULL;
   }
-  init_type_spec(&map->type_spec, free_map, DDSTS_MAP);
-  map->key_type = *key_type;
-  map->value_type = *value_type;
-  map->bounded = bounded;
-  map->max = max;
-  return map;
-}
-
-/* ddsts_definition_t (is abstract) */
-
-static void init_definition(ddsts_definition_t *definition, void (*free_func)(ddsts_node_t*), ddsts_node_flags_t flags, ddsts_identifier_t name)
-{
-  init_type_spec(&definition->type_spec, free_func, flags);
-  definition->name = name;
-}
-
-static void free_definition(ddsts_node_t *node)
-{
-  os_free((void*)((ddsts_definition_t*)node)->name);
-  free_type_spec(&((ddsts_definition_t*)node)->type_spec);
+  init_type(type, free_map, DDSTS_MAP, NULL);
+  set_type_ref(&type->map.key_type, key_type, type);
+  set_type_ref(&type->map.value_type, value_type, type);
+  type->map.max = max;
+  return type;
 }
 
 /* ddsts_module_t */
 
-static void free_module(ddsts_node_t *node)
+static void free_module(ddsts_type_t *type)
 {
-  free_definition(node);
+  free_children(type->module.members);
+  free_type(type);
 }
 
-ddsts_module_t *ddsts_create_module(ddsts_identifier_t name)
+ddsts_type_t *ddsts_create_module(ddsts_identifier_t name)
 {
-  ddsts_module_t *module = (ddsts_module_t*)os_malloc(sizeof(ddsts_module_t));
-  if (module == NULL) {
+  ddsts_type_t *type = (ddsts_type_t*)os_malloc(sizeof(ddsts_module_t));
+  if (type == NULL) {
     return NULL;
   }
-  init_definition(&module->def, free_module, DDSTS_MODULE, name);
-  module->previous = NULL;
-  return module;
+  init_type(type, free_module, DDSTS_MODULE, name);
+  type->module.members = NULL;
+  type->module.previous = NULL;
+  return type;
 }
 
 /* ddsts_forward_declaration_t */
 
-static void free_forward_declaration(ddsts_node_t *node)
+static void free_forward(ddsts_type_t *type)
 {
-  free_definition(node);
+  free_type(type);
 }
 
-extern ddsts_forward_declaration_t *ddsts_create_struct_forward_dcl(ddsts_identifier_t name)
+ddsts_type_t *ddsts_create_struct_forward_dcl(ddsts_identifier_t name)
 {
-  ddsts_forward_declaration_t *forward_dcl = (ddsts_forward_declaration_t*)os_malloc(sizeof(ddsts_forward_declaration_t));
-  if (forward_dcl == NULL) {
+  ddsts_type_t *type = (ddsts_type_t*)os_malloc(sizeof(ddsts_forward_t));
+  if (type == NULL) {
     return NULL;
   }
-  init_definition(&forward_dcl->def, free_forward_declaration, DDSTS_FORWARD_STRUCT, name);
-  forward_dcl->definition = NULL;
-  return forward_dcl;
+  init_type(type, free_forward, DDSTS_FORWARD_STRUCT, name);
+  type->forward.definition = NULL;
+  return type;
 }
 
 /* ddsts_struct_t */
 
-static void free_struct(ddsts_node_t *node)
+static void free_struct(ddsts_type_t *type)
 {
-  free_definition(node);
+  free_children(type->struct_def.members);
+  free_type(type);
 }
 
-extern ddsts_struct_t *ddsts_create_struct(ddsts_identifier_t name)
+ddsts_type_t *ddsts_create_struct(ddsts_identifier_t name)
 {
-  ddsts_struct_t *new_struct = (ddsts_struct_t*)os_malloc(sizeof(ddsts_struct_t));
-  if (new_struct == NULL) {
+  ddsts_type_t *type = (ddsts_type_t*)os_malloc(sizeof(ddsts_struct_t));
+  if (type == NULL) {
     return NULL;
   }
-  init_definition(&new_struct->def, free_struct, DDSTS_STRUCT, name);
-  new_struct->super = NULL;
-  new_struct->part_of = false;
-  return new_struct;
+  init_type(type, free_struct, DDSTS_STRUCT, name);
+  type->struct_def.members = NULL;
+  type->struct_def.super = NULL;
+  return type;
 }
 
-/* ddsts_struct_member_t */
+/* ddsts_declarator_t */
 
-static void free_struct_member(ddsts_node_t *node)
+static void free_declaration(ddsts_type_t *type)
 {
-  free_type_spec_ptr(&((ddsts_struct_member_t*)node)->member_type);
-  free_node(&((ddsts_struct_member_t*)node)->node);
+  free_type_ref(type->declaration.decl_type, type);
+  free_type(type);
 }
 
-extern ddsts_struct_member_t *ddsts_create_struct_member(ddsts_type_spec_ptr_t *member_type)
+ddsts_type_t *ddsts_create_declaration(ddsts_identifier_t name, ddsts_type_t *decl_type)
 {
-  ddsts_struct_member_t *member = (ddsts_struct_member_t*)os_malloc(sizeof(ddsts_struct_member_t));
-  if (member == NULL) {
+  ddsts_type_t *type = (ddsts_type_t*)os_malloc(sizeof(ddsts_declaration_t));
+  if (type == NULL) {
     return NULL;
   }
-  init_node(&member->node, free_struct_member, DDSTS_STRUCT_MEMBER);
-  member->member_type = *member_type;
-  return member;
-}
-
-/* Declarator */
-
-extern ddsts_definition_t *ddsts_create_declarator(ddsts_identifier_t name)
-{
-  ddsts_definition_t* declarator = (ddsts_definition_t*)os_malloc(sizeof(ddsts_definition_t));
-  if (declarator == NULL) {
-    return NULL;
-  }
-  init_definition(declarator, free_definition, DDSTS_DECLARATOR, name);
-  return declarator;
-}
-
-/* ddsts_array_size_t */
-
-static void free_array_size(ddsts_node_t *node)
-{
-  free_node(&((ddsts_array_size_t*)node)->node);
-}
-
-extern ddsts_array_size_t *ddsts_create_array_size(unsigned long long size)
-{
-  ddsts_array_size_t *array_size = (ddsts_array_size_t*)os_malloc(sizeof(ddsts_array_size_t));
-  if (array_size == NULL) {
-    return NULL;
-  }
-  init_node(&array_size->node, free_array_size, DDSTS_ARRAY_SIZE);
-  array_size->size = size;
-  return array_size;
+  init_type(type, free_declaration, DDSTS_DECLARATION, name);
+  type->declaration.decl_type = decl_type;
+  return type;
 }
 

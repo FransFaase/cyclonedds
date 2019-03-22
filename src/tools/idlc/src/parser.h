@@ -12,8 +12,8 @@
 #ifndef IDL_PARSER_H
 #define IDL_PARSER_H
 
-int ddsts_parse_file(const char *file, void (*error_func)(int line, int column, const char *msg), ddsts_node_t **ref_root_node);
-int ddsts_parse_string(const char *str, void (*error_func)(int line, int column, const char *msg), ddsts_node_t **ref_root_node);
+int ddsts_parse_file(const char *file, void (*error_func)(int line, int column, const char *msg), ddsts_type_t **ref_root_type);
+int ddsts_parse_string(const char *str, void (*error_func)(int line, int column, const char *msg), ddsts_type_t **ref_root_type);
 
 #endif /* IDL_PARSER_H */
 

@@ -59,9 +59,7 @@ add_library(idll STATIC
     "${source_dir}/parser.c"
     "${source_dir}/tt_create.c"
     "${BISON_parser_OUTPUTS}"
-    "${FLEX_lexer_OUTPUTS}"
-    "${source_dir}/gen_c99.c"
-    "${source_dir}/gen_ostream.c")
+    "${FLEX_lexer_OUTPUTS}")
 
 target_include_directories(
   idll PUBLIC "${source_dir}" "${GENERATED_SOURCE_DIR}")

@@ -48,11 +48,11 @@ int illegal_identifier(const char *token);
 
 
 %union {
-  ddsts_node_flags_t base_type_flags;
-  ddsts_type_spec_ptr_t type_spec_ptr;
+  ddsts_flags_t base_type_flags;
+  ddsts_type_t *type_ptr;
   ddsts_literal_t literal;
   ddsts_identifier_t identifier;
-  ddsts_scoped_name_t* scoped_name;
+  ddsts_scoped_name_t *scoped_name;
 }
 
 %define api.pure full
@@ -92,7 +92,7 @@ int illegal_identifier(const char *token);
   boolean_type
   octet_type
 
-%type <type_spec_ptr>
+%type <type_ptr>
   type_spec
   simple_type_spec
   template_type_spec
@@ -237,7 +237,7 @@ simple_type_spec:
       }
   | scoped_name
       {
-        if (!ddsts_get_type_spec_from_scoped_name(context, $1, &($$))) {
+        if (!ddsts_get_type_from_scoped_name(context, $1, &($$))) {
           YYABORT;
         }
       }
@@ -254,9 +254,9 @@ base_type_spec:
 
 /* Basic Types */
 floating_pt_type:
-    "float" { $$ = DDSTS_FLOAT_TYPE; }
-  | "double" { $$ = DDSTS_DOUBLE_TYPE; }
-  | "long" "double" { $$ = DDSTS_LONG_DOUBLE_TYPE; };
+    "float" { $$ = DDSTS_FLOAT; }
+  | "double" { $$ = DDSTS_DOUBLE; }
+  | "long" "double" { $$ = DDSTS_LONGDOUBLE; };
 
 integer_type:
     signed_int
@@ -264,28 +264,28 @@ integer_type:
   ;
 
 signed_int:
-    "short" { $$ = DDSTS_SHORT_TYPE; }
-  | "long" { $$ = DDSTS_LONG_TYPE; }
-  | "long" "long" { $$ = DDSTS_LONG_LONG_TYPE; }
+    "short" { $$ = DDSTS_SHORT; }
+  | "long" { $$ = DDSTS_LONG; }
+  | "long" "long" { $$ = DDSTS_LONGLONG; }
   ;
 
 unsigned_int:
-    "unsigned" "short" { $$ = DDSTS_UNSIGNED_SHORT_TYPE; }
-  | "unsigned" "long" { $$ = DDSTS_UNSIGNED_LONG_TYPE; }
-  | "unsigned" "long" "long" { $$ = DDSTS_UNSIGNED_LONG_LONG_TYPE; }
+    "unsigned" "short" { $$ = DDSTS_USHORT; }
+  | "unsigned" "long" { $$ = DDSTS_ULONG; }
+  | "unsigned" "long" "long" { $$ = DDSTS_ULONGLONG; }
   ;
 
 char_type:
-    "char" { $$ = DDSTS_CHAR_TYPE; };
+    "char" { $$ = DDSTS_CHAR; };
 
 wide_char_type:
-    "wchar" { $$ = DDSTS_WIDE_CHAR_TYPE; };
+    "wchar" { $$ = DDSTS_WIDE_CHAR; };
 
 boolean_type:
-    "boolean" { $$ = DDSTS_BOOLEAN_TYPE; };
+    "boolean" { $$ = DDSTS_BOOLEAN; };
 
 octet_type:
-    "octet" { $$ = DDSTS_OCTET_TYPE; };
+    "octet" { $$ = DDSTS_OCTET; };
 
 template_type_spec:
     sequence_type
@@ -297,13 +297,13 @@ template_type_spec:
 sequence_type:
     "sequence" '<' type_spec ',' positive_int_const '>'
       {
-        if (!ddsts_new_sequence(context, &($3), &($5), &($$))) {
+        if (!ddsts_new_sequence(context, $3, &($5), &($$))) {
           YYABORT;
         }
       }
   | "sequence" '<' type_spec '>'
       {
-        if (!ddsts_new_sequence_unbound(context, &($3), &($$))) {
+        if (!ddsts_new_sequence_unbound(context, $3, &($$))) {
           YYABORT;
         }
       }
@@ -375,13 +375,13 @@ members:
 member:
     type_spec
       {
-        if (!ddsts_add_struct_member(context, &($1))) {
+        if (!ddsts_add_struct_member(context, $1)) {
           YYABORT;
         }
       }
     declarators ';'
 /* Embedded struct extension: */
-  | struct_def { ddsts_add_struct_member(context, &($1)); }
+  | struct_def { ddsts_add_struct_member(context, $1); }
     declarators ';'
 
   ;
@@ -460,13 +460,13 @@ template_type_spec:
 map_type:
     "map" '<' type_spec ',' type_spec ',' positive_int_const '>'
       {
-        if (!ddsts_new_map(context, &($3), &($5), &($7), &($$))) {
+        if (!ddsts_new_map(context, $3, $5, &($7), &($$))) {
           YYABORT;
         }
       }
   | "map" '<' type_spec ',' type_spec '>'
       {
-        if (!ddsts_new_map_unbound(context, &($3), &($5), &($$))) {
+        if (!ddsts_new_map_unbound(context, $3, $5, &($$))) {
           YYABORT;
         }
       }
@@ -486,14 +486,14 @@ unsigned_int:
   | unsigned_longlong_int
   ;
 
-signed_tiny_int: "int8" { $$ = DDSTS_INT8_TYPE; };
-unsigned_tiny_int: "uint8" { $$ = DDSTS_UINT8_TYPE; };
-signed_short_int: "int16" { $$ = DDSTS_SHORT_TYPE; };
-signed_long_int: "int32" { $$ = DDSTS_LONG_TYPE; };
-signed_longlong_int: "int64" { $$ = DDSTS_LONG_LONG_TYPE; };
-unsigned_short_int: "uint16" { $$ = DDSTS_UNSIGNED_SHORT_TYPE; };
-unsigned_long_int: "uint32" { $$ = DDSTS_UNSIGNED_LONG_TYPE; };
-unsigned_longlong_int: "uint64" { $$ = DDSTS_UNSIGNED_LONG_LONG_TYPE; };
+signed_tiny_int: "int8" { $$ = DDSTS_INT8; };
+unsigned_tiny_int: "uint8" { $$ = DDSTS_UINT8; };
+signed_short_int: "int16" { $$ = DDSTS_SHORT; };
+signed_long_int: "int32" { $$ = DDSTS_LONG; };
+signed_longlong_int: "int64" { $$ = DDSTS_LONGLONG; };
+unsigned_short_int: "uint16" { $$ = DDSTS_USHORT; };
+unsigned_long_int: "uint32" { $$ = DDSTS_ULONG; };
+unsigned_longlong_int: "uint64" { $$ = DDSTS_ULONGLONG; };
 
 /* From Building Block Anonymous Types: */
 type_spec: template_type_spec ;

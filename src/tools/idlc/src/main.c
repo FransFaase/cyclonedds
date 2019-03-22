@@ -16,7 +16,6 @@
 
 #include "dds/ddsts/typetree.h"
 #include "parser.h"
-#include "gen_c99.h"
 
 static void
 usage(const char *prog)
@@ -37,14 +36,12 @@ main(int argc, char *argv[])
     return EXIT_FAILURE;
   }
 
-  ddsts_node_t *root_node = NULL;
-  if (ddsts_parse_file(argv[1], report_error, &root_node) != 0) {
+  ddsts_type_t *root_type = NULL;
+  if (ddsts_parse_file(argv[1], report_error, &root_type) != 0) {
     return EXIT_FAILURE;
   }
 
-  ddsts_generate_C99(argv[1], root_node);
-
-  ddsts_free_node(root_node);
+  ddsts_free_type(root_type);
 
   return EXIT_SUCCESS;
 }

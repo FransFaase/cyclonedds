@@ -16,54 +16,45 @@
 #include <stdint.h>
 #include "dds/ddsts/export.h"
 
-/*
- * The bits used for the flags are:
- * 0-7: the specific base type
- * 8-13: the type spec
- * 14-15: the definitions
- * 16-: the other nodes
- */
-
 #define DDSTS_TYPE(X)                  (1L<<(X))
 
-#define DDSTS_BASIC_TYPES              ((1L<<18)-1L)
-#define DDSTS_SHORT_TYPE               DDSTS_TYPE(0)
-#define DDSTS_LONG_TYPE                DDSTS_TYPE(1)
-#define DDSTS_LONG_LONG_TYPE           DDSTS_TYPE(2)
-#define DDSTS_UNSIGNED_SHORT_TYPE      DDSTS_TYPE(3)
-#define DDSTS_UNSIGNED_LONG_TYPE       DDSTS_TYPE(4)
-#define DDSTS_UNSIGNED_LONG_LONG_TYPE  DDSTS_TYPE(5)
-#define DDSTS_CHAR_TYPE                DDSTS_TYPE(6)
-#define DDSTS_WIDE_CHAR_TYPE           DDSTS_TYPE(7)
-#define DDSTS_BOOLEAN_TYPE             DDSTS_TYPE(8)
-#define DDSTS_OCTET_TYPE               DDSTS_TYPE(9)
-#define DDSTS_INT8_TYPE                DDSTS_TYPE(10)
-#define DDSTS_UINT8_TYPE               DDSTS_TYPE(11)
-#define DDSTS_FLOAT_TYPE               DDSTS_TYPE(12)
-#define DDSTS_DOUBLE_TYPE              DDSTS_TYPE(13)
-#define DDSTS_LONG_DOUBLE_TYPE         DDSTS_TYPE(14)
-#define DDSTS_FIXED_PT_CONST_TYPE      DDSTS_TYPE(15)
-#define DDSTS_ANY_TYPE                 DDSTS_TYPE(16)
+#define DDSTS_BASIC_TYPES              ((1L<<(16+1)-1L)
+#define DDSTS_SHORT                    DDSTS_TYPE(0)
+#define DDSTS_LONG                     DDSTS_TYPE(1)
+#define DDSTS_LONGLONG                 DDSTS_TYPE(2)
+#define DDSTS_USHORT                   DDSTS_TYPE(3)
+#define DDSTS_ULONG                    DDSTS_TYPE(4)
+#define DDSTS_ULONGLONG                DDSTS_TYPE(5)
+#define DDSTS_CHAR                     DDSTS_TYPE(6)
+#define DDSTS_WIDE_CHAR                DDSTS_TYPE(7)
+#define DDSTS_BOOLEAN                  DDSTS_TYPE(8)
+#define DDSTS_OCTET                    DDSTS_TYPE(9)
+#define DDSTS_INT8                     DDSTS_TYPE(10)
+#define DDSTS_UINT8                    DDSTS_TYPE(11)
+#define DDSTS_FLOAT                    DDSTS_TYPE(12)
+#define DDSTS_DOUBLE                   DDSTS_TYPE(13)
+#define DDSTS_LONGDOUBLE               DDSTS_TYPE(14)
+#define DDSTS_FIXED_PT_CONST           DDSTS_TYPE(15)
+#define DDSTS_ANY                      DDSTS_TYPE(16)
+
 #define DDSTS_SEQUENCE                 DDSTS_TYPE(17)
+#define DDSTS_ARRAY                    DDSTS_TYPE(18)
+#define DDSTS_STRING                   DDSTS_TYPE(19)
+#define DDSTS_WIDE_STRING              DDSTS_TYPE(20)
+#define DDSTS_FIXED_PT                 DDSTS_TYPE(21)
+#define DDSTS_MAP                      DDSTS_TYPE(22)
 
-#define DDSTS_STRING                   DDSTS_TYPE(18)
-#define DDSTS_WIDE_STRING              DDSTS_TYPE(19)
-#define DDSTS_FIXED_PT                 DDSTS_TYPE(20)
-#define DDSTS_MAP                      DDSTS_TYPE(21)
+#define DDSTS_DEFINITIONS              (((1L<<(26-23+1))-1L)<<23)
+#define DDSTS_MODULE                   DDSTS_TYPE(23)
+#define DDSTS_FORWARD_STRUCT           DDSTS_TYPE(24)
+#define DDSTS_STRUCT                   DDSTS_TYPE(25)
+#define DDSTS_DECLARATION              DDSTS_TYPE(26)
 
-#define DDSTS_DEFINITIONS              (((1L<<4)-1L)<<22)
-#define DDSTS_MODULE                   DDSTS_TYPE(22)
-#define DDSTS_FORWARD_STRUCT           DDSTS_TYPE(23)
-#define DDSTS_STRUCT                   DDSTS_TYPE(24)
-#define DDSTS_DECLARATOR               DDSTS_TYPE(25)
-
-#define DDSTS_STRUCT_MEMBER            DDSTS_TYPE(26)
-#define DDSTS_ARRAY_SIZE               DDSTS_TYPE(27)
-
-#define DDSTS_TYPE_SPECS               ((1L<<26)-1L)
+#define DDSTS_TYPE_SPECS               ((1L<<(26+1)-1L)
 #define DDSTS_IS_TYPE_SPEC(X)          ((DDSTS_TYPE_SPECS & (X)) != 0)
 #define DDSTS_IS_BASE_TYPE(X)          ((DDSTS_BASE_TYPES & (X)) != 0)
 #define DDSTS_IS_DEFINITION(X)         ((DDSTS_DEFINITIONS & (X)) != 0)
+
 
 /* Open issues:
  * - include file and line information in type definitions.
@@ -78,10 +69,10 @@ typedef char *ddsts_identifier_t;
  * IDL elements, such as the constant definition and the case labels.
  */
 
-typedef uint32_t ddsts_node_flags_t;
+typedef uint32_t ddsts_flags_t;
 
 typedef struct {
-  ddsts_node_flags_t flags; /* flags defining the kind of the literal */
+  ddsts_flags_t flags; /* flags defining the kind of the literal */
   union {
     bool bln;
     char chr;
@@ -94,161 +85,139 @@ typedef struct {
 } ddsts_literal_t;
 
 
-/* Generic node
+/* Type specification
  *
- * The generic node serves as a basis for all other elements of the IDL type
- * definitions
+ * The union ddsts_type_t is used to contain all possible type specifications,
+ * where the struct ddsts_typespec_t serves as a basis for these type specifications.
  */
 
-typedef struct ddsts_node ddsts_node_t;
-struct ddsts_node {
-  ddsts_node_flags_t flags; /* flags defining the kind of the node */
-  ddsts_node_t *parent;     /* pointer to the parent node */
-  ddsts_node_t *children;   /* pointer to the first child */
-  ddsts_node_t *next;       /* pointer to the next sibling */
+typedef union ddsts_type ddsts_type_t;
+
+DDSTS_EXPORT void ddsts_free_type(ddsts_type_t *type);
+
+typedef struct ddsts_typespec ddsts_typespec_t;
+struct ddsts_typespec {
+  ddsts_flags_t flags; /* flags defining the kind of the node */
+  ddsts_identifier_t name;
+  ddsts_type_t *parent;     /* pointer to the parent node */
+  ddsts_type_t *next;       /* pointer to the next sibling */
   /* Maybe also needs information about the file and line where the node has
    * been parsed from. This is maybe needed to determine for which parts
    * of the preprocessed output code needs to be generated.
    */
-  void (*free_func)(ddsts_node_t*);
+  void (*free_func)(ddsts_type_t*);
 };
-
-DDSTS_EXPORT void ddsts_free_node(ddsts_node_t *node);
-
-
-/* Type specifications */
-
-/* Type specification (type_spec) */
-typedef struct {
-  ddsts_node_t node;
-} ddsts_type_spec_t;
 
 /* Base type specification (base_type_spec) */
 typedef struct {
-  ddsts_type_spec_t type_spec;
+  ddsts_typespec_t typespec;
 } ddsts_base_type_t;
 
-DDSTS_EXPORT ddsts_base_type_t *ddsts_create_base_type(ddsts_node_flags_t flags);
-
-/* Pointer to type spec */
-typedef struct {
-  ddsts_type_spec_t *type_spec;
-  bool is_reference;
-} ddsts_type_spec_ptr_t;
-
-DDSTS_EXPORT void ddsts_type_spec_ptr_assign(ddsts_type_spec_ptr_t *type_spec_ptr, ddsts_type_spec_t *type_spec);
-DDSTS_EXPORT void ddsts_type_spec_ptr_assign_reference(ddsts_type_spec_ptr_t *type_spec_ptr, ddsts_type_spec_t *type_spec);
+DDSTS_EXPORT ddsts_type_t *ddsts_create_base_type(ddsts_flags_t flags);
 
 /* Sequence type (sequence_type) */
 typedef struct {
-  ddsts_type_spec_t type_spec;
-  ddsts_type_spec_ptr_t element_type;
-  bool bounded;
+  ddsts_typespec_t typespec;
+  ddsts_type_t *element_type;
   unsigned long long max;
 } ddsts_sequence_t;
 
-DDSTS_EXPORT ddsts_sequence_t *ddsts_create_sequence(ddsts_type_spec_ptr_t* element_type, bool bounded, unsigned long long max);
+DDSTS_EXPORT ddsts_type_t *ddsts_create_sequence(ddsts_type_t* element_type, unsigned long long max);
+
+/* Array type */
+typedef struct {
+  ddsts_typespec_t typespec;
+  ddsts_type_t *element_type;
+  unsigned long long size;
+} ddsts_array_t;
+
+DDSTS_EXPORT ddsts_type_t *ddsts_create_array(ddsts_type_t* element_type, unsigned long long max);
 
 /* (Wide) string type (string_type, wide_string_type) */
 typedef struct {
-  ddsts_type_spec_t type_spec;
-  bool bounded;
+  ddsts_typespec_t typespec;
   unsigned long long max;
 } ddsts_string_t;
 
-DDSTS_EXPORT ddsts_string_t *ddsts_create_string(ddsts_node_flags_t flags, bool bounded, unsigned long long max);
+DDSTS_EXPORT ddsts_type_t *ddsts_create_string(ddsts_flags_t flags, unsigned long long max);
 
 /* Fixed point type (fixed_pt_type) */
 typedef struct {
-  ddsts_type_spec_t type_spec;
+  ddsts_typespec_t typespec;
   unsigned long long digits;
   unsigned long long fraction_digits;
 } ddsts_fixed_pt_t;
 
-DDSTS_EXPORT ddsts_fixed_pt_t *ddsts_create_fixed_pt(unsigned long long digits, unsigned long long fraction_digits);
+DDSTS_EXPORT ddsts_type_t *ddsts_create_fixed_pt(unsigned long long digits, unsigned long long fraction_digits);
 
 /* Map type (map_type) */
 typedef struct {
-  ddsts_type_spec_t type_spec;
-  ddsts_type_spec_ptr_t key_type;
-  ddsts_type_spec_ptr_t value_type;
-  bool bounded;
+  ddsts_typespec_t typespec;
+  ddsts_type_t *key_type;
+  ddsts_type_t *value_type;
   unsigned long long max;
 } ddsts_map_t;
 
-DDSTS_EXPORT ddsts_map_t *ddsts_create_map(ddsts_type_spec_ptr_t *key_type, ddsts_type_spec_ptr_t *value_type, bool bounded, unsigned long long max);
-
-
-/* Type definitions */
-
-/* Definition (definition)
- * (all definitions share a name)
- */
-typedef struct {
-  ddsts_type_spec_t type_spec;
-  ddsts_identifier_t name;
-} ddsts_definition_t;
+DDSTS_EXPORT ddsts_type_t *ddsts_create_map(ddsts_type_t *key_type, ddsts_type_t *value_type, unsigned long long max);
 
 /* Module declaration (module_dcl)
- * - defintions appear as children
  * (Probably needs extra member (and type) for definitions that are introduced
  * by non-top scoped names when checking the scope rules.)
  */
 typedef struct ddsts_module ddsts_module_t;
 struct ddsts_module {
-  ddsts_definition_t def;
+  ddsts_typespec_t type;
+  ddsts_type_t *members;
   ddsts_module_t *previous; /* to previous open of this module, if present */
 };
 
-DDSTS_EXPORT ddsts_module_t *ddsts_create_module(ddsts_identifier_t name);
+DDSTS_EXPORT ddsts_type_t *ddsts_create_module(ddsts_identifier_t name);
 
 /* Forward declaration */
 typedef struct {
-  ddsts_definition_t def;
-  ddsts_definition_t *definition; /* reference to the actual definition */
-} ddsts_forward_declaration_t;
+  ddsts_typespec_t type;
+  ddsts_type_t *definition; /* reference to the actual definition */
+} ddsts_forward_t;
 
 /* Struct forward declaration (struct_forward_dcl)
- * ddsts_forward_declaration_t (no extra members)
+ * ddsts_forward_t (no extra members)
  */
 
-DDSTS_EXPORT ddsts_forward_declaration_t *ddsts_create_struct_forward_dcl(ddsts_identifier_t name);
+DDSTS_EXPORT ddsts_type_t *ddsts_create_struct_forward_dcl(ddsts_identifier_t name);
 
 /* Struct declaration (struct_def)
- * - members (and nested struct declarations) appear as children
  */
 typedef struct {
-  ddsts_definition_t def;
-  ddsts_definition_t *super; /* used for extended struct type definition */
-  bool part_of; /* true when used in other definition */
+  ddsts_typespec_t type;
+  ddsts_type_t *super; /* used for extended struct type definition */
+  ddsts_type_t *members;
 } ddsts_struct_t;
 
-DDSTS_EXPORT ddsts_struct_t *ddsts_create_struct();
+DDSTS_EXPORT ddsts_type_t *ddsts_create_struct();
 
-/* Struct member (members)
- * - declarators appear as chidren
+/* Declaration
  */
 typedef struct {
-  ddsts_node_t node;
-  ddsts_type_spec_ptr_t member_type;
-} ddsts_struct_member_t;
+  ddsts_typespec_t type;
+  ddsts_type_t *decl_type;
+} ddsts_declaration_t;
 
-DDSTS_EXPORT ddsts_struct_member_t *ddsts_create_struct_member(ddsts_type_spec_ptr_t *member_type);
+DDSTS_EXPORT ddsts_type_t *ddsts_create_declaration(ddsts_identifier_t name, ddsts_type_t *decl_type);
 
-/* Declarator (declarator)
- * - fixed array sizes appear as children
- * use ddsts_definition_t (no extra members)
- */
 
-DDSTS_EXPORT ddsts_definition_t *ddsts_create_declarator(ddsts_identifier_t name);
-
-/* Fixed array size (fixed_array_size) */
-typedef struct {
-  ddsts_node_t node;
-  unsigned long long size;
-} ddsts_array_size_t;
-
-DDSTS_EXPORT ddsts_array_size_t *ddsts_create_array_size(unsigned long long size);
-
+/* The union of all type specs */
+union ddsts_type {
+  ddsts_typespec_t type;
+  ddsts_base_type_t base_type;
+  ddsts_sequence_t sequence;
+  ddsts_array_t array;
+  ddsts_string_t string;
+  ddsts_fixed_pt_t fixed_pt;
+  ddsts_map_t map;
+  ddsts_module_t module;
+  ddsts_forward_t forward;
+  ddsts_struct_t struct_def;
+  ddsts_declaration_t declaration;
+};
 
 #endif /* DDS_TYPE_TYPETREE_H */

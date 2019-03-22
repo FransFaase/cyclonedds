@@ -27,23 +27,17 @@ static void report_error(int line, int column, const char *msg)
 
 bool test_parse_stringify(const char *input, const char *output)
 {
-  ddsts_node_t *root_node = NULL;
-  if (ddsts_parse_string(input, report_error, &root_node) != 0) {
+  ddsts_type_t *root_type = NULL;
+  if (ddsts_parse_string(input, report_error, &root_type) != 0) {
     return false;
   }
 
   char buffer[1000];
   buffer[0] = '\0';
 
-  ddsts_ostream_t *ostream = NULL;
-  ddsts_create_ostream_to_buffer(buffer, 999, &ostream);
-  if (ostream == NULL) {
-    return false;
-  }
-  ddsts_stringify(root_node, ostream);
-  os_free((void*)ostream);
+  ddsts_stringify(root_type, buffer, 1000);
 
-  ddsts_free_node(root_node);
+  ddsts_free_type(root_type);
 
   if (strcmp(buffer, output) == 0)
   {
@@ -55,184 +49,214 @@ bool test_parse_stringify(const char *input, const char *output)
   return false;
 }
 
-CU_Test(parser, module2)
+static bool test_type(ddsts_type_t *type, ddsts_flags_t flags, const char *name, ddsts_type_t *parent, bool next_is_null)
 {
-  CU_ASSERT(test_parse_stringify("module a { struct e{char c;};};", "module a{struct e{char c,;}}"));
+  return    type != NULL && type->type.flags == flags && (name == NULL ? type->type.name == NULL : type->type.name != NULL && strcmp(type->type.name, name) == 0)
+         && type->type.parent == parent
+         && (!next_is_null || type->type.next == NULL);
 }
 
-CU_Test(parser, module3)
+static void test_basic_type(const char *idl, ddsts_flags_t flags)
 {
-  CU_ASSERT(test_parse_stringify("module a{struct f{char y;};}; module a { struct e{char x;};};", "module a{struct f{char y,;}}module a{struct e{char x,;}}"));
+  ddsts_type_t *root_type = NULL;
+  CU_ASSERT(ddsts_parse_string(idl, report_error, &root_type) == 0);
+  CU_ASSERT(test_type(root_type, DDSTS_MODULE, NULL, NULL, true));
+  CU_ASSERT(root_type->module.previous == NULL);
+    ddsts_type_t *struct_s = root_type->module.members;
+    CU_ASSERT(test_type(struct_s, DDSTS_STRUCT, "s", root_type, true));
+      ddsts_type_t *decl_c = struct_s->struct_def.members;
+      CU_ASSERT(test_type(decl_c, DDSTS_DECLARATION, "c", struct_s, true));
+        ddsts_type_t *char_type = decl_c->declaration.decl_type;
+        CU_ASSERT(test_type(char_type, flags, NULL, decl_c, true));
+  ddsts_free_type(root_type);
 }
 
-CU_Test(parser, module4)
+CU_Test(parser, basic_types)
 {
-  CU_ASSERT(test_parse_stringify("module x  {module a { struct e{char c;};}; };", "module x{module a{struct e{char c,;}}}"));
+  test_basic_type("struct s{boolean c;};", DDSTS_BOOLEAN);
+  test_basic_type("struct s{char c;};", DDSTS_CHAR);
+  test_basic_type("struct s{wchar c;};", DDSTS_WIDE_CHAR);
+  test_basic_type("struct s{short c;};", DDSTS_SHORT);
+  test_basic_type("struct s{int16 c;};", DDSTS_SHORT);
+  test_basic_type("struct s{long c;};", DDSTS_LONG);
+  test_basic_type("struct s{int32 c;};", DDSTS_LONG);
+  test_basic_type("struct s{long long c;};", DDSTS_LONGLONG);
+  test_basic_type("struct s{int64 c;};", DDSTS_LONGLONG);
+  test_basic_type("struct s{unsigned short c;};", DDSTS_USHORT);
+  test_basic_type("struct s{uint16 c;};", DDSTS_USHORT);
+  test_basic_type("struct s{unsigned long c;};", DDSTS_ULONG);
+  test_basic_type("struct s{uint32 c;};", DDSTS_ULONG);
+  test_basic_type("struct s{unsigned long long c;};", DDSTS_ULONGLONG);
+  test_basic_type("struct s{uint64 c;};", DDSTS_ULONGLONG);
+  test_basic_type("struct s{octet c;};", DDSTS_OCTET);
+  test_basic_type("struct s{int8 c;};", DDSTS_INT8);
+  test_basic_type("struct s{uint8 c;};", DDSTS_UINT8);
+  test_basic_type("struct s{float c;};", DDSTS_FLOAT);
+  test_basic_type("struct s{double c;};", DDSTS_DOUBLE);
+  test_basic_type("struct s{long double c;};", DDSTS_LONGDOUBLE);
 }
 
-CU_Test(parser, module5)
+CU_Test(parser, one_module1)
 {
-  CU_ASSERT(test_parse_stringify("struct s {boolean c;};","struct s{bool c,;}"));
+  ddsts_type_t *root_type = NULL;
+  CU_ASSERT(ddsts_parse_string("module a{ struct s{char c;};};", report_error, &root_type) == 0);
+  CU_ASSERT(test_type(root_type, DDSTS_MODULE, NULL, NULL, true));
+  CU_ASSERT(root_type->module.previous == NULL);
+    ddsts_type_t *module_a = root_type->module.members;
+    CU_ASSERT(test_type(module_a, DDSTS_MODULE, "a", root_type, true));
+    CU_ASSERT(module_a->module.previous == NULL);
+      ddsts_type_t *struct_s = module_a->module.members;
+      CU_ASSERT(test_type(struct_s, DDSTS_STRUCT, "s", module_a, true));
+        ddsts_type_t *decl_c = struct_s->struct_def.members;
+        CU_ASSERT(test_type(decl_c, DDSTS_DECLARATION, "c", struct_s, true));
+          ddsts_type_t *char_type = decl_c->declaration.decl_type;
+          CU_ASSERT(test_type(char_type, DDSTS_CHAR, NULL, decl_c, true));
+  ddsts_free_type(root_type);
 }
 
-CU_Test(parser, module6)
+CU_Test(parser, reopen_module)
 {
-  CU_ASSERT(test_parse_stringify("struct s {char c;};","struct s{char c,;}"));
+  ddsts_type_t *root_type = NULL;
+  CU_ASSERT(ddsts_parse_string("module a{ struct s{char c;};}; module a { struct t{char x;};};", report_error, &root_type) == 0);
+  CU_ASSERT(test_type(root_type, DDSTS_MODULE, NULL, NULL, true));
+  CU_ASSERT(root_type->module.previous == NULL);
+    ddsts_type_t *module_a = root_type->module.members;
+    CU_ASSERT(test_type(module_a, DDSTS_MODULE, "a", root_type, false));
+    CU_ASSERT(module_a->module.previous == NULL);
+    {
+      ddsts_type_t *struct_s = module_a->module.members;
+      CU_ASSERT(test_type(struct_s, DDSTS_STRUCT, "s", module_a, true));
+        ddsts_type_t *decl_c = struct_s->struct_def.members;
+        CU_ASSERT(test_type(decl_c, DDSTS_DECLARATION, "c", struct_s, true));
+          ddsts_type_t *char_type = decl_c->declaration.decl_type;
+          CU_ASSERT(test_type(char_type, DDSTS_CHAR, NULL, decl_c, true));
+    }
+    ddsts_type_t *module_a2 = module_a->type.next;
+    CU_ASSERT(test_type(module_a2, DDSTS_MODULE, "a", root_type, true));
+    CU_ASSERT(module_a2->module.previous == &module_a->module);
+    {
+      ddsts_type_t *struct_t = module_a2->module.members;
+      CU_ASSERT(test_type(struct_t, DDSTS_STRUCT, "t", module_a2, true));
+        ddsts_type_t *decl_x = struct_t->struct_def.members;
+        CU_ASSERT(test_type(decl_x, DDSTS_DECLARATION, "x", struct_t, true));
+          ddsts_type_t *char_type = decl_x->declaration.decl_type;
+          CU_ASSERT(test_type(char_type, DDSTS_CHAR, NULL, decl_x, true));
+    }
+  ddsts_free_type(root_type);
 }
 
-CU_Test(parser, module7)
+CU_Test(parser, comma)
 {
-  CU_ASSERT(test_parse_stringify("struct s {wchar c;};","struct s{wchar c,;}"));
+  ddsts_type_t *root_type = NULL;
+  CU_ASSERT(ddsts_parse_string("struct s{char a, b;};", report_error, &root_type) == 0);
+  CU_ASSERT(test_type(root_type, DDSTS_MODULE, NULL, NULL, true));
+  CU_ASSERT(root_type->module.previous == NULL);
+    ddsts_type_t *struct_s = root_type->module.members;
+    CU_ASSERT(test_type(struct_s, DDSTS_STRUCT, "s", root_type, true));
+      ddsts_type_t *decl_a = struct_s->struct_def.members;
+      CU_ASSERT(test_type(decl_a, DDSTS_DECLARATION, "a", struct_s, false));
+        ddsts_type_t *char_type = decl_a->declaration.decl_type;
+        CU_ASSERT(test_type(char_type, DDSTS_CHAR, NULL, decl_a, true));
+      ddsts_type_t *decl_b = decl_a->type.next;
+      CU_ASSERT(test_type(decl_b, DDSTS_DECLARATION, "b", struct_s, true));
+        CU_ASSERT(decl_b->declaration.decl_type == char_type);
+  ddsts_free_type(root_type);
 }
 
-CU_Test(parser, module8)
+UC_Test(parser, sequences)
 {
-  CU_ASSERT(test_parse_stringify("struct s {short c;};","struct s{short c,;}"));
+  ddsts_type_t *root_type = NULL;
+  CU_ASSERT(ddsts_parse_string("struct s{sequence<char> us; sequence<char,8> bs; string ust; string<7> bst; wstring uwst; wstring<7> bwst;};", report_error, &root_type) == 0);
+  CU_ASSERT(test_type(root_type, DDSTS_MODULE, NULL, NULL, true));
+  CU_ASSERT(root_type->module.previous == NULL);
+    ddsts_type_t *struct_s = root_type->module.members;
+    CU_ASSERT(test_type(struct_s, DDSTS_STRUCT, "s", root_type, true));
+      ddsts_type_t *decl = struct_s->struct_def.members;
+      CU_ASSERT(test_type(decl, DDSTS_DECLARATION, "us", struct_s, false));
+        ddsts_type_t *s_type = decl->declaration.decl_type;
+        CU_ASSERT(test_type(s_type, DDSTS_, NULL, decl, true));
+      decl = decl->type.next;
+      CU_ASSERT(test_type(decl_b, DDSTS_DECLARATION, "bs", struct_s, false));
+        s_type = decl->declaration.decl_type;
+        CU_ASSERT(test_type(s_type, DDSTS_, NULL, decl, true));
+      decl = decl->type.next;
+      CU_ASSERT(test_type(decl_b, DDSTS_DECLARATION, "ust", struct_s, false));
+        s_type = decl->declaration.decl_type;
+        CU_ASSERT(test_type(s_type, DDSTS_, NULL, decl, true));
+      decl = decl->type.next;
+      CU_ASSERT(test_type(decl_b, DDSTS_DECLARATION, "bst", struct_s, false));
+        s_type = decl->declaration.decl_type;
+        CU_ASSERT(test_type(s_type, DDSTS_, NULL, decl, true));
+      decl = decl->type.next;
+      CU_ASSERT(test_type(decl_b, DDSTS_DECLARATION, "uwst", struct_s, false));
+        s_type = decl->declaration.decl_type;
+        CU_ASSERT(test_type(s_type, DDSTS_, NULL, decl, true));
+      decl = decl->type.next;
+      CU_ASSERT(test_type(decl_b, DDSTS_DECLARATION, "bwst", struct_s, true));
+        s_type = decl->declaration.decl_type;
+        CU_ASSERT(test_type(s_type, DDSTS_, NULL, decl, true));
+  ddsts_free_type(root_type);
 }
 
-CU_Test(parser, module9)
+/*
+UC_Test(parser, module26)
 {
-  CU_ASSERT(test_parse_stringify("struct s {int16 c;};","struct s{short c,;}"));
+  CU_ASSERT(test_parse_stringify("struct s {sequence<short> us; sequence<short> bs};",""));
 }
 
-CU_Test(parser, module10)
+UC_Test(parser, module27)
 {
-  CU_ASSERT(test_parse_stringify("struct s {long c;};","struct s{long c,;}"));
+  CU_ASSERT(test_parse_stringify("struct s {sequence<short,7> c;};",""));
 }
 
-CU_Test(parser, module11)
+UC_Test(parser, module28)
 {
-  CU_ASSERT(test_parse_stringify("struct s {int32 c;};","struct s{long c,;}"));
+  CU_ASSERT(test_parse_stringify("struct s {string c;};",""));
 }
 
-CU_Test(parser, module12)
+UC_Test(parser, module29)
 {
-  CU_ASSERT(test_parse_stringify("struct s {long long c;};","struct s{long long c,;}"));
+  CU_ASSERT(test_parse_stringify("struct s {string<9> c;};",""));
 }
 
-CU_Test(parser, module13)
+UC_Test(parser, module30)
 {
-  CU_ASSERT(test_parse_stringify("struct s {int64 c;};","struct s{long long c,;}"));
+  CU_ASSERT(test_parse_stringify("struct s {wstring c;};",""));
 }
 
-CU_Test(parser, module14)
+UC_Test(parser, module31)
 {
-  CU_ASSERT(test_parse_stringify("struct s {unsigned short c;};","struct s{unsigned short c,;}"));
+  CU_ASSERT(test_parse_stringify("struct s {wstring<9> c;};",""));
 }
 
-CU_Test(parser, module15)
+UC_Test(parser, module32)
 {
-  CU_ASSERT(test_parse_stringify("struct s {uint16 c;};","struct s{unsigned short c,;}"));
+  CU_ASSERT(test_parse_stringify("struct s {fixed<5,3> c;};",""));
 }
 
-CU_Test(parser, module16)
+UC_Test(parser, module33)
 {
-  CU_ASSERT(test_parse_stringify("struct s {unsigned long c;};","struct s{unsigned long c,;}"));
+  CU_ASSERT(test_parse_stringify("struct s {map<short,char> c;};",""));
 }
 
-CU_Test(parser, module17)
+UC_Test(parser, module34)
 {
-  CU_ASSERT(test_parse_stringify("struct s {uint32 c;};","struct s{unsigned long c,;}"));
+  CU_ASSERT(test_parse_stringify("struct s {map<short,char,5> c;};",""));
 }
 
-CU_Test(parser, module18)
+UC_Test(parser, module35)
 {
-  CU_ASSERT(test_parse_stringify("struct s {unsigned long long c;};","struct s{unsigned long long c,;}"));
+  CU_ASSERT(test_parse_stringify("struct s {char c,b;};",""));
 }
 
-CU_Test(parser, module19)
+UC_Test(parser, module36)
 {
-  CU_ASSERT(test_parse_stringify("struct s {uint64 c;};","struct s{unsigned long long c,;}"));
+  CU_ASSERT(test_parse_stringify("struct s {char c;wchar d,e;};",""));
 }
 
-CU_Test(parser, module20)
-{
-  CU_ASSERT(test_parse_stringify("struct s {octet c;};","struct s{octet c,;}"));
-}
-
-CU_Test(parser, module21)
-{
-  CU_ASSERT(test_parse_stringify("struct s {int8 c;};","struct s{int8 c,;}"));
-}
-
-CU_Test(parser, module22)
-{
-  CU_ASSERT(test_parse_stringify("struct s {uint8 c;};","struct s{uint8 c,;}"));
-}
-
-CU_Test(parser, module23)
-{
-  CU_ASSERT(test_parse_stringify("struct s {float c;};","struct s{float c,;}"));
-}
-
-CU_Test(parser, module24)
-{
-  CU_ASSERT(test_parse_stringify("struct s {double c;};","struct s{double c,;}"));
-}
-
-CU_Test(parser, module25)
-{
-  CU_ASSERT(test_parse_stringify("struct s {long double c;};","struct s{long double c,;}"));
-}
-
-CU_Test(parser, module26)
-{
-  CU_ASSERT(test_parse_stringify("struct s {sequence<short> c;};","struct s{sequence<short> c,;}"));
-}
-
-CU_Test(parser, module27)
-{
-  CU_ASSERT(test_parse_stringify("struct s {sequence<short,7> c;};","struct s{sequence<short,7> c,;}"));
-}
-
-CU_Test(parser, module28)
-{
-  CU_ASSERT(test_parse_stringify("struct s {string c;};","struct s{string c,;}"));
-}
-
-CU_Test(parser, module29)
-{
-  CU_ASSERT(test_parse_stringify("struct s {string<9> c;};","struct s{string<9> c,;}"));
-}
-
-CU_Test(parser, module30)
-{
-  CU_ASSERT(test_parse_stringify("struct s {wstring c;};","struct s{wstring c,;}"));
-}
-
-CU_Test(parser, module31)
-{
-  CU_ASSERT(test_parse_stringify("struct s {wstring<9> c;};","struct s{wstring<9> c,;}"));
-}
-
-CU_Test(parser, module32)
-{
-  CU_ASSERT(test_parse_stringify("struct s {fixed<5,3> c;};","struct s{fixed<5,3> c,;}"));
-}
-
-CU_Test(parser, module33)
-{
-  CU_ASSERT(test_parse_stringify("struct s {map<short,char> c;};","struct s{map<short,char> c,;}"));
-}
-
-CU_Test(parser, module34)
-{
-  CU_ASSERT(test_parse_stringify("struct s {map<short,char,5> c;};","struct s{map<short,char,5> c,;}"));
-}
-
-CU_Test(parser, module35)
-{
-  CU_ASSERT(test_parse_stringify("struct s {char c,b;};","struct s{char c,b,;}"));
-}
-
-CU_Test(parser, module36)
-{
-  CU_ASSERT(test_parse_stringify("struct s {char c;wchar d,e;};","struct s{char c,;wchar d,e,;}"));
-}
-
-CU_Test(parser, module37)
+UC_Test(parser, module37)
 {
   CU_ASSERT(test_parse_stringify("struct a{char c;};struct b{sequence<a> s;};",
-                                 "struct a{char c,;}struct b{sequence<a> s,;}"));
+                                 ""));
 }
-
+*/

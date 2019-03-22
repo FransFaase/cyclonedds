@@ -24,21 +24,21 @@ void ddsts_context_error(ddsts_context_t *context, int line, int column, const c
 void ddsts_context_set_error_func(ddsts_context_t *context, void (*error)(int line, int column, const char *msg));
 void ddsts_context_set_out_of_memory_error(ddsts_context_t* context);
 bool ddsts_context_get_out_of_memory_error(ddsts_context_t* context);
-ddsts_node_t* ddsts_context_take_root_node();
+ddsts_type_t* ddsts_context_take_root_type();
 void ddsts_free_context(ddsts_context_t* context);
 
-bool ddsts_new_base_type(ddsts_context_t *context, ddsts_node_flags_t flags, ddsts_type_spec_ptr_t *result);
-bool ddsts_new_sequence(ddsts_context_t *context, ddsts_type_spec_ptr_t *element_type, ddsts_literal_t *size, ddsts_type_spec_ptr_t *result);
-bool ddsts_new_sequence_unbound(ddsts_context_t *context, ddsts_type_spec_ptr_t *base, ddsts_type_spec_ptr_t *result);
-bool ddsts_new_string(ddsts_context_t *context, ddsts_literal_t *size, ddsts_type_spec_ptr_t *result);
-bool ddsts_new_string_unbound(ddsts_context_t *context, ddsts_type_spec_ptr_t *result);
-bool ddsts_new_wide_string(ddsts_context_t *context, ddsts_literal_t *size, ddsts_type_spec_ptr_t *result);
-bool ddsts_new_wide_string_unbound(ddsts_context_t *context, ddsts_type_spec_ptr_t *result);
-bool ddsts_new_fixed_pt(ddsts_context_t *context, ddsts_literal_t *digits, ddsts_literal_t *fraction_digits, ddsts_type_spec_ptr_t *result);
-bool ddsts_new_map(ddsts_context_t *context, ddsts_type_spec_ptr_t *key_type, ddsts_type_spec_ptr_t *value_type, ddsts_literal_t *size, ddsts_type_spec_ptr_t *result);
-bool ddsts_new_map_unbound(ddsts_context_t *context, ddsts_type_spec_ptr_t *key_type, ddsts_type_spec_ptr_t *value_type, ddsts_type_spec_ptr_t *result);
+bool ddsts_new_base_type(ddsts_context_t *context, ddsts_flags_t flags, ddsts_type_t **result);
+bool ddsts_new_sequence(ddsts_context_t *context, ddsts_type_t *element_type, ddsts_literal_t *size, ddsts_type_t **result);
+bool ddsts_new_sequence_unbound(ddsts_context_t *context, ddsts_type_t *base, ddsts_type_t **result);
+bool ddsts_new_string(ddsts_context_t *context, ddsts_literal_t *size, ddsts_type_t **result);
+bool ddsts_new_string_unbound(ddsts_context_t *context, ddsts_type_t **result);
+bool ddsts_new_wide_string(ddsts_context_t *context, ddsts_literal_t *size, ddsts_type_t **result);
+bool ddsts_new_wide_string_unbound(ddsts_context_t *context, ddsts_type_t **result);
+bool ddsts_new_fixed_pt(ddsts_context_t *context, ddsts_literal_t *digits, ddsts_literal_t *fraction_digits, ddsts_type_t **result);
+bool ddsts_new_map(ddsts_context_t *context, ddsts_type_t *key_type, ddsts_type_t *value_type, ddsts_literal_t *size, ddsts_type_t **result);
+bool ddsts_new_map_unbound(ddsts_context_t *context, ddsts_type_t *key_type, ddsts_type_t *value_type, ddsts_type_t **result);
 bool ddsts_new_scoped_name(ddsts_context_t *context, ddsts_scoped_name_t* prev, bool top, ddsts_identifier_t name, ddsts_scoped_name_t **result);
-bool ddsts_get_type_spec_from_scoped_name(ddsts_context_t *context, ddsts_scoped_name_t *scoped_name, ddsts_type_spec_ptr_t *result);
+bool ddsts_get_type_from_scoped_name(ddsts_context_t *context, ddsts_scoped_name_t *scoped_name, ddsts_type_t **result);
 
 bool ddsts_module_open(ddsts_context_t *context, ddsts_identifier_t name);
 void ddsts_module_close(ddsts_context_t *context);
@@ -46,9 +46,9 @@ void ddsts_module_close(ddsts_context_t *context);
 bool ddsts_add_struct_forward(ddsts_context_t *context, ddsts_identifier_t name);
 bool ddsts_add_struct_open(ddsts_context_t *context, ddsts_identifier_t name);
 bool ddsts_add_struct_extension_open(ddsts_context_t *context, ddsts_identifier_t name, ddsts_scoped_name_t *scoped_name);
-bool ddsts_add_struct_member(ddsts_context_t *context, ddsts_type_spec_ptr_t *type);
-void ddsts_struct_close(ddsts_context_t *context, ddsts_type_spec_ptr_t *result);
-void ddsts_struct_empty_close(ddsts_context_t *context, ddsts_type_spec_ptr_t *result);
+bool ddsts_add_struct_member(ddsts_context_t *context, ddsts_type_t *type);
+void ddsts_struct_close(ddsts_context_t *context, ddsts_type_t **result);
+void ddsts_struct_empty_close(ddsts_context_t *context, ddsts_type_t **result);
 
 bool ddsts_add_declarator(ddsts_context_t *context, ddsts_identifier_t name);
 

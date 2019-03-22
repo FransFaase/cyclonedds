@@ -16,18 +16,35 @@
 #include "dds/ddsts/typetree.h"
 #include "dds/ddsts/type_walk.h"
 
-void ddsts_walk(ddsts_walk_exec_state_t *exec_state, ddsts_node_flags_t visit, ddsts_node_flags_t call, ddsts_walk_call_func_t func, void *context)
+void ddsts_walk(ddsts_walk_exec_state_t *exec_state, ddsts_flags_t visit, ddsts_flags_t call, ddsts_walk_call_func_t func, void *context)
 {
   ddsts_walk_exec_state_t child_exec_state;
   child_exec_state.call_parent = exec_state;
-  for (ddsts_node_t *child = exec_state->node->children; child != NULL; child = child->next) {
-    child_exec_state.node = child;
-    if ((child->flags & call) != 0) {
-      func(&child_exec_state, context);
-    }
-    if ((child->flags & visit) != 0) {
-      ddsts_walk(&child_exec_state, visit, call, func, context);
-    }
+  switch (exec_state->type->type.flags) {
+    case DDSTS_MODULE:
+      for (ddsts_type_t *member = exec_state->type->module.members; member != NULL; member = member->type.next) {
+        child_exec_state.type = member;
+        if ((member->type.flags & call) != 0) {
+          func(&child_exec_state, context);
+        }
+        if ((member->type.flags & visit) != 0) {
+          ddsts_walk(&child_exec_state, visit, call, func, context);
+        }
+      }
+      break;
+    case DDSTS_STRUCT:
+      for (ddsts_type_t *member = exec_state->type->struct_def.members; member != NULL; member = member->type.next) {
+        child_exec_state.type = member;
+        if ((member->type.flags & call) != 0) {
+          func(&child_exec_state, context);
+        }
+        if ((member->type.flags & visit) != 0) {
+          ddsts_walk(&child_exec_state, visit, call, func, context);
+        }
+      }
+      break;
+    default:
+      break;
   }
 }
 

@@ -13,9 +13,7 @@ include(CUnit)
 
 set(sources_foobar
   "parser.c"
-  "gen_C99.c"
-  "stringify.c"
-  "type_walker.c")
+  "stringify.c")
 
 add_cunit_executable(testtypes ${sources_foobar})
 target_link_libraries(testtypes OSAPI idll)

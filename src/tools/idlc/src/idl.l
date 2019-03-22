@@ -78,7 +78,7 @@ identifier                [a-zA-Z_][a-zA-Z0-9_]*
 
 
 {integer_literal}         {
-                            yylval->literal.flags = DDSTS_UNSIGNED_LONG_LONG_TYPE;
+                            yylval->literal.flags = DDSTS_ULONGLONG;
                             /* strtoll recognizes if the value is dec, oct or hex if base is zero */
                             int saved_errno = os_getErrno();
                             os_setErrno(0);

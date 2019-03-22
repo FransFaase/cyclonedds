@@ -17,7 +17,6 @@
 #include <stdbool.h>
 #include "os/os.h"
 #include "dds/ddsts/typetree.h"
-#include "gen_c99.h"
 
 #define YYSTYPE DDSTS_PARSER_STYPE
 #define YYLTYPE DDSTS_PARSER_LTYPE
@@ -33,9 +32,9 @@ typedef void* yyscan_t;
 #include "idl.lexer.h"
 
 extern int
-ddsts_parse_file(const char *file, void (*error_func)(int line, int column, const char *msg), ddsts_node_t **ref_root_node)
+ddsts_parse_file(const char *file, void (*error_func)(int line, int column, const char *msg), ddsts_type_t **ref_root_type)
 {
-  *ref_root_node = NULL;
+  *ref_root_type = NULL;
 
   int err = 0;
   FILE *fh;
@@ -66,7 +65,7 @@ OS_WARNING_MSVC_ON(4996);
     ddsts_parser_set_in(fh, scanner);
     err = ddsts_parser_parse(scanner, context);
     if (err == 0) {
-      *ref_root_node = ddsts_context_take_root_node(context);
+      *ref_root_type = ddsts_context_take_root_type(context);
     }
     else if (ddsts_context_get_out_of_memory_error(context)) {
       if (error_func != 0) {
@@ -82,9 +81,9 @@ OS_WARNING_MSVC_ON(4996);
 }
 
 extern int
-ddsts_parse_string(const char *str, void (*error_func)(int line, int column, const char *text), ddsts_node_t **ref_root_node)
+ddsts_parse_string(const char *str, void (*error_func)(int line, int column, const char *text), ddsts_type_t **ref_root_type)
 {
-  *ref_root_node = NULL;
+  *ref_root_type = NULL;
 
   int err = 0;
 
@@ -109,7 +108,7 @@ ddsts_parse_string(const char *str, void (*error_func)(int line, int column, con
     ddsts_parser__scan_string(str, scanner);
     err = ddsts_parser_parse(scanner, context);
     if (err == 0) {
-      *ref_root_node = ddsts_context_take_root_node(context);
+      *ref_root_type = ddsts_context_take_root_type(context);
     }
     else if (ddsts_context_get_out_of_memory_error(context)) {
       if (error_func != 0) {

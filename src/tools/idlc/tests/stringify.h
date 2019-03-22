@@ -10,8 +10,7 @@
  * SPDX-License-Identifier: EPL-2.0 OR BSD-3-Clause
  */
 #include "dds/ddsts/typetree.h"
-#include "type_walker.h"
 
-void ddsts_stringify(ddsts_node_t *root_node, ddsts_ostream_t *ostream);
+void ddsts_stringify(ddsts_type_t *root_type, char *buffer, size_t len);
 
 

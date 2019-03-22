@@ -15,12 +15,12 @@
 
 typedef struct ddsts_walk_exec_state_t ddsts_walk_exec_state_t;
 struct ddsts_walk_exec_state_t {
-  ddsts_node_t *node;
+  ddsts_type_t *type;
   ddsts_walk_exec_state_t *call_parent;
 };
 
 typedef void (*ddsts_walk_call_func_t)(ddsts_walk_exec_state_t *exec_state, void *context);
 
-void ddsts_walk(ddsts_walk_exec_state_t *exec_state, ddsts_node_flags_t visit, ddsts_node_flags_t call, ddsts_walk_call_func_t func, void *context);
+void ddsts_walk(ddsts_walk_exec_state_t *exec_state, ddsts_flags_t visit, ddsts_flags_t call, ddsts_walk_call_func_t func, void *context);
 
 #endif /* DDSTS_TYPE_WALK_H */
