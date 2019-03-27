@@ -14,6 +14,7 @@
 #include <stdlib.h>
 #include <stdbool.h>
 
+#include "dds/ddsts/typetree.h"
 #include "parser.h"
 
 static void
@@ -30,13 +31,17 @@ void report_error(int line, int column, const char *msg)
 int
 main(int argc, char *argv[])
 {
-  int ret = EXIT_FAILURE;
-
   if (argc != 2) {
     usage(argv[0]);
-  } else if (dds_ts_parse_file(argv[1], report_error) == 0) {
-    ret = EXIT_SUCCESS;
+    return EXIT_FAILURE;
   }
 
-  return ret;
+  ddsts_type_t *root_type = NULL;
+  if (dds_idl_parse_file(argv[1], report_error, &root_type) != DDS_RETCODE_OK) {
+    return EXIT_FAILURE;
+  }
+
+  ddsts_free_type(root_type);
+
+  return EXIT_SUCCESS;
 }

@@ -9,14 +9,14 @@
  *
  * SPDX-License-Identifier: EPL-2.0 OR BSD-3-Clause
  */
-#ifndef DDS_TS_YY_DECL_H
-#define DDS_TS_YY_DECL_H
+#ifndef DDSTS_YY_DECL_H
+#define DDSTS_YY_DECL_H
 
-#define YY_DECL int dds_ts_parser_lex \
+#define YY_DECL int dds_parser_lex \
   (YYSTYPE * yylval_param, \
    YYLTYPE * yylloc_param, \
    yyscan_t yyscanner, \
-   dds_ts_context_t *context)
+   dds_context_t *context)
 
 extern YY_DECL;
 
@@ -29,5 +29,5 @@ int parser_token_matches_keyword(const char *token, int *token_number);
 
 #define YYTYPE_INT16 int
 
-#endif /* DDS_TS_YY_DECL_H */
+#endif /* DDSTS_YY_DECL_H */
 

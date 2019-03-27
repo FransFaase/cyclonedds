@@ -183,3 +183,146 @@ union type {
 };
 ```
 
+#### Details
+
+Although the TypeTree follows the IDL syntax, there is one notable
+exceptions. Consider for example, the following fragment of IDL:
+
+```C
+struct s {
+   short a[3], b[5][6];
+};
+```
+
+The the syntax tree would look like:
+```
+   struct 's'
+   |
+   +-- member
+       |
+       +-- type 'short'
+       |
+       +-- declarators
+           |
+           +-- declarator 'a'
+           |   |
+           |   +-- array size '3'
+           |
+           +-- declarator 'b'
+               |
+               +-- array size '5'
+               |
+               +-- array size '6'
+```
+
+But in the TypeTree it is better to use the following tree representation
+that follows the 'semantic' representation of a type better:
+
+```
+   struct 's'
+   |
+   +-- declaration 'a'
+   |   |
+   |   +-- array size '3'
+   |       |
+   |       +-- short   <-------+
+   |                           |
+   +-- declaration 'b'         |
+       |                       |
+       +-- array size '5'      |
+           |                   |
+           +-- array size '6'  |
+               |               |
+               +---------------+
+```
+
+Note that the type 'short' is shared between the two declarations and
+that a far more complex type could have been used instead.
+During the freeing of the TypeTree, some mechanism is needed to determine
+if a tree is shared or not. Although, reference counting is commonly used
+for this, we decide to use a special flag for this. In the above example
+this flag will be set on the type `array size '6'`. (Because a map has two
+types, it requires two different flags for this.)
+
+
+
+#### Examples with structs
+
+There are several ways to define the 'same' data structure with
+(anonymous) structs. Below three examples are given, together with
+the type trees.
+
+The first example defines a struct `A`, which is used in struct `B`.
+```C
+   struct A {
+     short a;
+   };
+   struct B {
+     A b;
+   };
+```
+This results in the following TypeTree:
+```
+  |
+  +-- struct 'A'  <---------+
+  |   |                     |
+  |   +-- declaration 'a'   |
+  |       |                 |
+  |       +-- short         |
+  |                         |
+  +-- struct 'B'            |
+      |                     |
+      +-- declaration 'b'   |
+          |                 |
+          +-----------------+
+```
+
+In the second example, the struct `A` appears as an embedded struct
+inside struct `B`.
+```C
+   struct B {
+     struct A {
+       short a;
+     }
+     A b;
+   };
+```
+This results in the following TypeTree:
+```
+  |
+  +-- struct 'B'
+      |
+      +-- struct 'A'  <---------+
+      |   |                     |
+      |   +-- declaration 'a'   |
+      |       |                 |
+      |       +-- short         |
+      |                         |
+      +-- declaration 'b'       |
+          |                     |
+          +---------------------+
+```
+
+In the third example, an anonymous struct is used in the declaration of `b`.
+```C
+   struct B {
+     struct {
+       short a;
+     } b;
+   };
+```
+This results in the following TypeTree:
+```
+  |
+  +-- struct 'B'
+      |
+      +-- declarator 'b'
+          |
+          +-- struct
+              |
+              +-- declarator 'a'
+                  |
+                  +-- short
+```
+
+

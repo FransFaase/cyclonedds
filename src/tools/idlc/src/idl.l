@@ -14,13 +14,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-
-#include "dds/ddsrt/retcode.h"
 #include "dds/ddsrt/strtol.h"
 
 /* YYSTYPE and YYLTYPE defines are required because idl.y defines api.prefix */
-#define YYSTYPE DDS_TS_PARSER_STYPE
-#define YYLTYPE DDS_TS_PARSER_LTYPE
+#define YYSTYPE DDS_PARSER_STYPE
+#define YYLTYPE DDS_PARSER_LTYPE
 
 #include "idl.parser.h"
 /* YY_DECL must be defined here because yyparse passes an additional argument */
@@ -39,8 +37,8 @@
       } \
     }
 
-#define yyerror dds_ts_parser_error
-int yyerror(YYLTYPE *yylloc, yyscan_t yyscanner, dds_ts_context_t *context, char *text);
+#define yyerror dds_parser_error
+int yyerror(YYLTYPE *yylloc, yyscan_t yyscanner, dds_context_t *context, char *text);
 
 %}
 
@@ -52,7 +50,7 @@ int yyerror(YYLTYPE *yylloc, yyscan_t yyscanner, dds_ts_context_t *context, char
 %option noyywrap
 %option nounistd
 %option never-interactive
-%option prefix="dds_ts_parser_"
+%option prefix="dds_parser_"
 %option reentrant
 %option bison-bridge
 %option bison-locations
@@ -80,15 +78,10 @@ identifier                [a-zA-Z_][a-zA-Z0-9_]*
 
 
 {integer_literal}         {
-                            dds_retcode_t rc;
-                            yylval->literal.flags = DDS_TS_UNSIGNED_LONG_LONG_TYPE;
+                            yylval->literal.flags = DDSTS_ULONGLONG;
                             /* strtoll recognizes if the value is dec, oct or hex if base is zero */
-                            rc = ddsrt_strtoull(
-                              yytext, NULL, 0, &yylval->literal.value.ullng);
-                            /* No need to check if nothing was parsed as there
-                               must be at least one number for the regular
-                               expression to match. */
-                            if (rc == DDS_RETCODE_OUT_OF_RANGE) {
+                            dds_retcode_t retcode = ddsrt_strtoull(yytext, NULL, 0, &yylval->literal.value.ullng);
+                            if (retcode != DDS_RETCODE_OK) {
                               yyerror(yylloc_param, yyscanner, context, "Integer value invalid");
                             }
                             return INTEGER_LITERAL;
