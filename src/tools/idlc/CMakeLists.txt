@@ -60,6 +60,6 @@ target_include_directories(idll PRIVATE "${GENERATED_SOURCE_DIR}")
 target_link_libraries(idll PUBLIC ddsc)
 target_link_libraries(idll PUBLIC ddsts)
 
-add_executable(idlpp "src/main.c")
+add_executable(idlpp "src/main.c" "src/templ_script.c")
 target_link_libraries(idlpp PRIVATE idll)
 
