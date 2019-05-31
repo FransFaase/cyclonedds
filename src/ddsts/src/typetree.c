@@ -20,7 +20,7 @@
 void ddsts_free_literal(ddsts_literal_t *literal)
 {
   if (literal->flags == DDSTS_STRING || literal->flags == DDSTS_WIDE_STRING) {
-    ddsrt_free((void*)literal->value.str);
+    ddsrt_free(literal->value.str);
   }
 }
 
@@ -71,8 +71,8 @@ static void init_type(ddsts_type_t *type, void (*free_func)(ddsts_type_t*), ddst
 
 static void free_type(ddsts_type_t *type)
 {
-  ddsrt_free((void*)type->type.name);
-  ddsrt_free((void*)type);
+  ddsrt_free(type->type.name);
+  ddsrt_free(type);
 }
 
 /* ddsts_base_type_t */
@@ -262,12 +262,12 @@ dds_retcode_t ddsts_module_add_member(ddsts_type_t *module, ddsts_type_t *member
       ddsts_module_t *parent_module;
       for (parent_module = &module->module; parent_module != NULL; parent_module = parent_module->previous) {
         ddsts_type_t *child;
-	    for (child = parent_module->members; child != NULL; child = child->type.next) {
-		  if (DDSTS_IS_TYPE(child, DDSTS_FORWARD_STRUCT) && strcmp(child->type.name, member->type.name) == 0) {
-		    child->forward.definition = member;
-		  }
-	    }
-	  }
+        for (child = parent_module->members; child != NULL; child = child->type.next) {
+          if (DDSTS_IS_TYPE(child, DDSTS_FORWARD_STRUCT) && strcmp(child->type.name, member->type.name) == 0) {
+            child->forward.definition = member;
+          }
+        }
+      }
     }
   }
   return DDS_RETCODE_OK;
@@ -296,6 +296,11 @@ dds_retcode_t ddsts_create_struct_forward_dcl(ddsts_identifier_t name, ddsts_typ
 
 static void free_struct(ddsts_type_t *type)
 {
+  for (ddsts_struct_key_t *key = type->struct_def.keys; key != NULL;) {
+    ddsts_struct_key_t *next = key->next;
+    ddsrt_free(key);
+    key = next;
+  }
   free_children(type->struct_def.members);
   free_type(type);
 }
@@ -309,6 +314,7 @@ dds_retcode_t ddsts_create_struct(ddsts_identifier_t name, ddsts_type_t **result
   init_type(type, free_struct, DDSTS_STRUCT, name);
   type->struct_def.members = NULL;
   type->struct_def.super = NULL;
+  type->struct_def.keys = NULL;
   *result = type;
   return DDS_RETCODE_OK;
 }
@@ -323,6 +329,21 @@ dds_retcode_t ddsts_struct_add_member(ddsts_type_t *struct_def, ddsts_type_t *me
     }
     *ref_child = member;
   }
+  return DDS_RETCODE_OK;
+}
+
+dds_retcode_t ddsts_struct_add_key(ddsts_type_t *struct_def, ddsts_type_t *member)
+{
+  ddsts_struct_key_t **ref_key = &struct_def->struct_def.keys;
+  while (*ref_key != NULL) {
+    ref_key = &(*ref_key)->next;
+  }
+  (*ref_key) = (ddsts_struct_key_t*)ddsrt_malloc(sizeof(ddsts_struct_key_t));
+  if (*ref_key == NULL) {
+    return DDS_RETCODE_OUT_OF_RESOURCES;
+  }
+  (*ref_key)->member = member;
+  (*ref_key)->next = NULL;
   return DDS_RETCODE_OK;
 }
 

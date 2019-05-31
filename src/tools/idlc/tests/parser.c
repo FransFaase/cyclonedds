@@ -36,6 +36,7 @@ static void test_basic_type(const char *idl, ddsts_flags_t flags)
       CU_ASSERT(test_type(decl_c, DDSTS_DECLARATION, "c", struct_s, true));
         ddsts_type_t *char_type = decl_c->declaration.decl_type;
         CU_ASSERT(test_type(char_type, flags, NULL, decl_c, true));
+      CU_ASSERT(struct_s->struct_def.keys == NULL);
   ddsts_free_type(root_type);
 }
 
@@ -79,6 +80,7 @@ CU_Test(parser, one_module1)
         CU_ASSERT(test_type(decl_c, DDSTS_DECLARATION, "c", struct_s, true));
           ddsts_type_t *char_type = decl_c->declaration.decl_type;
           CU_ASSERT(test_type(char_type, DDSTS_CHAR, NULL, decl_c, true));
+        CU_ASSERT(struct_s->struct_def.keys == NULL);
   ddsts_free_type(root_type);
 }
 
@@ -98,6 +100,7 @@ CU_Test(parser, reopen_module)
         CU_ASSERT(test_type(decl_c, DDSTS_DECLARATION, "c", struct_s, true));
           ddsts_type_t *char_type = decl_c->declaration.decl_type;
           CU_ASSERT(test_type(char_type, DDSTS_CHAR, NULL, decl_c, true));
+        CU_ASSERT(struct_s->struct_def.keys == NULL);
     }
     ddsts_type_t *module_a2 = module_a->type.next;
     CU_ASSERT(test_type(module_a2, DDSTS_MODULE, "a", root_type, true));
@@ -109,6 +112,7 @@ CU_Test(parser, reopen_module)
         CU_ASSERT(test_type(decl_x, DDSTS_DECLARATION, "x", struct_t, true));
           ddsts_type_t *char_type = decl_x->declaration.decl_type;
           CU_ASSERT(test_type(char_type, DDSTS_CHAR, NULL, decl_x, true));
+        CU_ASSERT(struct_t->struct_def.keys == NULL);
     }
   ddsts_free_type(root_type);
 }
@@ -157,6 +161,7 @@ CU_Test(parser, comma)
       ddsts_type_t *decl_b = decl_a->type.next;
       CU_ASSERT(test_type(decl_b, DDSTS_DECLARATION, "b", struct_s, true));
         CU_ASSERT(decl_b->declaration.decl_type == char_type);
+      CU_ASSERT(struct_s->struct_def.keys == NULL);
   ddsts_free_type(root_type);
 }
 
@@ -213,7 +218,7 @@ CU_Test(parser, types)
         s_type = decl->declaration.decl_type;
         CU_ASSERT(test_type(s_type, DDSTS_FIXED_PT, NULL, decl, true));
         CU_ASSERT(s_type->fixed_pt.digits == 5);
-        CU_ASSERT(s_type->fixed_pt.fraction_digits == 3); 
+        CU_ASSERT(s_type->fixed_pt.fraction_digits == 3);
       decl = decl->type.next;
       CU_ASSERT(test_type(decl, DDSTS_DECLARATION, "um", struct_s, false));
         s_type = decl->declaration.decl_type;
@@ -271,6 +276,58 @@ CU_Test(parser, array)
           CU_ASSERT(test_type(elem_type, DDSTS_SEQUENCE, NULL, s_type, true));
             elem_type2 = elem_type->sequence.element_type;
             CU_ASSERT(test_type(elem_type2, DDSTS_CHAR, NULL, elem_type, true));
+      CU_ASSERT(struct_s->struct_def.keys == NULL);
+  ddsts_free_type(root_type);
+}
+
+static void test_topic_keys(const char *idl, const char *keystr)
+{
+  ddsts_type_t *root_type = NULL;
+  CU_ASSERT(ddsts_idl_parse_string(idl, &root_type) == DDS_RETCODE_OK);
+  CU_ASSERT(test_type(root_type, DDSTS_MODULE, NULL, NULL, true));
+  CU_ASSERT(root_type->module.previous == NULL);
+    ddsts_type_t *struct_s = root_type->module.members;
+    CU_ASSERT(test_type(struct_s, DDSTS_STRUCT, "s", root_type, true));
+      ddsts_type_t *decl_a = struct_s->struct_def.members;
+      CU_ASSERT(test_type(decl_a, DDSTS_DECLARATION, "a", struct_s, false));
+        ddsts_type_t *char_type = decl_a->declaration.decl_type;
+        CU_ASSERT(test_type(char_type, DDSTS_CHAR, NULL, decl_a, true));
+      ddsts_type_t *decl_b = decl_a->type.next;
+      CU_ASSERT(test_type(decl_b, DDSTS_DECLARATION, "b", struct_s, true));
+        char_type = decl_b->declaration.decl_type;
+        CU_ASSERT(decl_b->declaration.decl_type == char_type);
+      ddsts_struct_key_t *keys = struct_s->struct_def.keys;
+      for (; *keystr != '\0'; keystr++, keys = keys->next)
+      {
+        CU_ASSERT_FATAL(keys != NULL);
+        CU_ASSERT(*keystr != 'a' || keys->member == decl_a);
+        CU_ASSERT(*keystr != 'b' || keys->member == decl_b);
+      }
+      CU_ASSERT(keys == NULL);
+  ddsts_free_type(root_type);
+}
+
+CU_Test(parser, topic_keys)
+{
+  test_topic_keys("struct s{ @key char a; char b;};", "a");
+  test_topic_keys("struct s{ char a; @key char b;};", "b");
+  test_topic_keys("struct s{ @key char a; @key char b;};", "ab");
+  test_topic_keys("struct s{ @key char a, b;};", "ab");
+  test_topic_keys("struct s{ char a; char b;};\n#pragma keylist s a\n", "a");
+  test_topic_keys("struct s{ char a; char b;};\n#pragma keylist s a b\n", "ab");
+  test_topic_keys("struct s{ char a; char b;};\n#pragma keylist s b a\n", "ba");
+  ddsts_type_t *root_type = NULL;
+  CU_ASSERT(ddsts_idl_parse_string("module a{ struct s{char c;};}; module b { struct t{@key ::a::s x;};};", &root_type) == DDS_RETCODE_OK);
+  CU_ASSERT(test_type(root_type, DDSTS_MODULE, NULL, NULL, true));
+    ddsts_type_t *module_a = root_type->module.members;
+    CU_ASSERT(test_type(module_a, DDSTS_MODULE, "a", root_type, false));
+    ddsts_type_t *module_b = module_a->type.next;
+    CU_ASSERT(test_type(module_b, DDSTS_MODULE, "b", root_type, true));
+      ddsts_type_t *struct_t = module_b->module.members;
+      CU_ASSERT(test_type(struct_t, DDSTS_STRUCT, "t", module_b, true));
+      CU_ASSERT(struct_t->struct_def.keys != NULL);
+      CU_ASSERT(struct_t->struct_def.keys->member != NULL);
+      CU_ASSERT(strcmp(struct_t->struct_def.keys->member->type.name, "x") == 0);
   ddsts_free_type(root_type);
 }
 
@@ -288,6 +345,7 @@ CU_Test(parser, errors)
   CU_ASSERT(root_type == NULL);
   CU_ASSERT(ddsts_idl_parse_string("struct s{char a[3][4];};", &root_type) == DDS_RETCODE_OK);
   ddsts_free_type(root_type);
+  root_type = NULL;
   CU_ASSERT(ddsts_idl_parse_string("struct s{char a[3][4];}", &root_type) == DDS_RETCODE_ERROR);
   CU_ASSERT(root_type == NULL);
   CU_ASSERT(ddsts_idl_parse_string("struct s{char a[3][4];", &root_type) == DDS_RETCODE_ERROR);
@@ -326,5 +384,20 @@ CU_Test(parser, errors)
   CU_ASSERT(ddsts_idl_parse_string("struct s{map<char,char!> m;};", &root_type) == DDS_RETCODE_ERROR);
   CU_ASSERT(ddsts_idl_parse_string("struct s{map<char,!char> m;};", &root_type) == DDS_RETCODE_ERROR);
   CU_ASSERT(ddsts_idl_parse_string("struct s{map<char!,char> m;};", &root_type) == DDS_RETCODE_ERROR);
+  CU_ASSERT(ddsts_idl_parse_string("struct s{@key string a[4];};", &root_type) == DDS_RETCODE_ERROR);
+  CU_ASSERT(ddsts_idl_parse_string("struct s{@key sequence<char> a;};", &root_type) == DDS_RETCODE_ERROR);
+  CU_ASSERT(ddsts_idl_parse_string("struct s{@key struct{sequence<char> cs;} a;};", &root_type) == DDS_RETCODE_ERROR);
+  CU_ASSERT(ddsts_idl_parse_string("struct s{char c;};\n#pragma keylis\n", &root_type) == DDS_RETCODE_OK);
+  ddsts_free_type(root_type);
+  root_type = NULL;
+  CU_ASSERT(ddsts_idl_parse_string("struct s{char c;};\n#pragma keylist\n", &root_type) == DDS_RETCODE_ERROR);
+  CU_ASSERT(ddsts_idl_parse_string("struct s{char c;};\n#pragma keylist v\n", &root_type) == DDS_RETCODE_ERROR);
+  CU_ASSERT(ddsts_idl_parse_string("struct s{char c;};\n#pragma keylist s\n", &root_type) == DDS_RETCODE_OK);
+  ddsts_free_type(root_type);
+  root_type = NULL;
+  CU_ASSERT(ddsts_idl_parse_string("struct s{char c;};\n#pragma keylist s v\n", &root_type) == DDS_RETCODE_ERROR);
+  CU_ASSERT(ddsts_idl_parse_string("module a{ struct s{char c;};}; module b { struct t{@ key a::s x;};};", &root_type) == DDS_RETCODE_ERROR);
+  CU_ASSERT(ddsts_idl_parse_string("module a{ struct s{char c;};}; module b { struct t{@key a ::s x;};};", &root_type) == DDS_RETCODE_ERROR);
+  CU_ASSERT(ddsts_idl_parse_string("module a{ struct s{char c;};}; module b { struct t{@key a:: s x;};};", &root_type) == DDS_RETCODE_ERROR);
 }
 
