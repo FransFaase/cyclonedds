@@ -242,6 +242,45 @@ CU_Test(parser, types)
   ddsts_free_type(root_type);
 }
 
+CU_Test(parser, union)
+{
+  ddsts_type_t *root_type = NULL;
+  CU_ASSERT_FATAL(ddsts_idl_parse_string("union a switch(short) { case 0: short b; case 1: octet c; default: char d; };", &root_type) == DDS_RETCODE_OK);
+  CU_ASSERT(test_type(root_type, DDSTS_MODULE, NULL, NULL, true));
+  CU_ASSERT(root_type->module.previous == NULL);
+    ddsts_type_t *union_s = root_type->module.members.first;
+    CU_ASSERT(test_type(union_s, DDSTS_UNION, "a", root_type, true));
+      CU_ASSERT(union_s->union_def.switch_type == DDSTS_SHORT);
+      ddsts_type_t *union_case = union_s->union_def.cases.first;
+      CU_ASSERT(test_type(union_case, DDSTS_UNION_CASE, "b", union_s, false));
+        CU_ASSERT(!union_case->union_case.default_label);
+        ddsts_union_case_label_t *label = union_case->union_case.labels;
+        CU_ASSERT(label != NULL && label->value.flags == DDSTS_SHORT);
+        CU_ASSERT(label != NULL && label->value.value.ullng == 0);
+        CU_ASSERT(label->value.value.ullng == 0LL);
+        CU_ASSERT(label->next == NULL);
+        ddsts_type_t *case_type = union_case->declaration.decl_type;
+        CU_ASSERT(test_type(case_type, DDSTS_SHORT, NULL, union_case, true));
+      union_case = union_case->type.next;
+        CU_ASSERT(test_type(union_case, DDSTS_UNION_CASE, "c", union_s, false));
+        CU_ASSERT(!union_case->union_case.default_label);
+        label = union_case->union_case.labels;
+        CU_ASSERT(label != NULL && label->value.flags == DDSTS_SHORT);
+        CU_ASSERT(label != NULL && label->value.value.ullng == 1);
+        CU_ASSERT(label->value.value.ullng == 1LL);
+        CU_ASSERT(label->next == NULL);
+        case_type = union_case->declaration.decl_type;
+        CU_ASSERT(test_type(case_type, DDSTS_OCTET, NULL, union_case, true));
+      union_case = union_case->type.next;
+        CU_ASSERT(test_type(union_case, DDSTS_UNION_CASE, "d", union_s, true));
+        CU_ASSERT(union_case->union_case.default_label);
+        label = union_case->union_case.labels;
+        CU_ASSERT(label == NULL);
+        case_type = union_case->declaration.decl_type;
+        CU_ASSERT(test_type(case_type, DDSTS_CHAR, NULL, union_case, true));
+  ddsts_free_type(root_type);
+}
+
 CU_Test(parser, array)
 {
   ddsts_type_t *root_type = NULL;
