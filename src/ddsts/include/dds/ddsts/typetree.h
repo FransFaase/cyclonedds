@@ -46,7 +46,6 @@
 #define DDSTS_FIXED_PT                 DDSTS_TYPE(21)
 #define DDSTS_MAP                      DDSTS_TYPE(22)
 
-#define DDSTS_DEFINITIONS              (((1ULL<<(26-23+1))-1ULL)<<23)
 #define DDSTS_MODULE                   DDSTS_TYPE(23)
 #define DDSTS_FORWARD_STRUCT           DDSTS_TYPE(24)
 #define DDSTS_STRUCT                   DDSTS_TYPE(25)
@@ -54,6 +53,7 @@
 #define DDSTS_FORWARD_UNION            DDSTS_TYPE(27)
 #define DDSTS_UNION                    DDSTS_TYPE(28)
 #define DDSTS_UNION_CASE               DDSTS_TYPE(29)
+#define DDSTS_DEFINITIONS              (DDSTS_MODULE | DDSTS_FORWARD_STRUCT | DDSTS_STRUCT | DDSTS_FORWARD_UNION | DDSTS_UNION)
 
 #define DDSTS_TYPES                    ((1ULL<<(29+1))-1ULL)
 #define DDSTS_TYPE_OF(O)               ((O)->type.flags & DDSTS_TYPES)

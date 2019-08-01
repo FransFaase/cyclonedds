@@ -233,7 +233,16 @@ static bool resolve_scoped_name(ddsts_context_t *context, ddsts_scoped_name_t *s
     }
   }
   /* Could not resolve scoped name */
-  DDS_ERROR("Could not resolve scoped name\n");
+  DDS_ERROR("Could not resolve scoped name '");
+  if (scoped_name->top)
+    DDS_ERROR("::");
+  for (ddsts_scoped_name_t *cur_scoped_name = scoped_name; cur_scoped_name != NULL; cur_scoped_name = cur_scoped_name->next) {
+    DDS_ERROR("%s", cur_scoped_name->name);
+    if (cur_scoped_name->next != NULL) {
+      DDS_ERROR("::");
+    }
+  }
+  DDS_ERROR("'\n");
   *result = NULL;
   return false;
 }

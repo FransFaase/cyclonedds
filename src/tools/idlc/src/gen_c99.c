@@ -687,6 +687,59 @@ static dds_retcode_t write_header_struct(ddsts_call_path_t *path, void *context)
   return write_header_close_struct(path, context);
 }
 
+static dds_retcode_t write_header_union(ddsts_call_path_t *path, void *context)
+{
+  const char *full_name = name_with_module_prefix(path->type, "_");
+  if (full_name == NULL) {
+    return DDS_RETCODE_OUT_OF_RESOURCES;
+  }
+
+  output(((output_context_t*)context)->ostream,
+         "typedef struct $N\n"
+         "{\n",
+         'N', full_name,
+         '\0');
+
+
+  output(((output_context_t*)context)->ostream,
+         "} $N;\n"
+         "\n"
+         "#define $N__alloc() \\\n"
+         "(($N*) dds_alloc(sizeof ($N)));\n"
+         "\n",
+         'N', full_name,
+         '\0');
+
+  ddsrt_free((void*)full_name);
+
+  return DDS_RETCODE_OK;
+}
+
+static dds_retcode_t write_header_forward_union(ddsts_call_path_t *path, void *context)
+{
+  assert(DDSTS_IS_TYPE(path->type, DDSTS_FORWARD_STRUCT));
+  ddsts_type_t *union_def = path->type->forward.definition;
+  if (union_def == NULL) {
+    DDS_ERROR("no struct definition");
+    return DDS_RETCODE_ERROR;
+  }
+
+  const char *full_name = name_with_module_prefix(union_def, "_");
+  if (full_name == NULL) {
+    return DDS_RETCODE_OUT_OF_RESOURCES;
+  }
+
+  output(((output_context_t*)context)->ostream,
+         "typedef union $N $N;\n"
+         "\n",
+         'N', full_name,
+         '\0');
+
+  ddsrt_free((void*)full_name);
+
+  return DDS_RETCODE_OK;
+}
+
 static dds_retcode_t write_header_modules(ddsts_call_path_t *path, void *context)
 {
   switch (DDSTS_TYPE_OF(path->type)) {
@@ -695,6 +748,12 @@ static dds_retcode_t write_header_modules(ddsts_call_path_t *path, void *context
       break;
     case DDSTS_FORWARD_STRUCT:
       return write_header_forward_struct(path, context);
+      break;
+    case DDSTS_UNION:
+      return write_header_union(path, context);
+      break;
+    case DDSTS_FORWARD_UNION:
+      return write_header_forward_union(path, context);
       break;
     default:
       break;
@@ -733,7 +792,7 @@ static dds_retcode_t generate_header_file(const char *file_name, ddsts_type_t *r
   path.call_parent = NULL;
   path.type = root_node;
 
-  rc = ddsts_walk(&path, DDSTS_MODULE, DDSTS_STRUCT | DDSTS_FORWARD_STRUCT, write_header_modules, &context.output_context);
+  rc = ddsts_walk(&path, DDSTS_MODULE, DDSTS_STRUCT | DDSTS_FORWARD_STRUCT | DDSTS_UNION | DDSTS_FORWARD_UNION, write_header_modules, &context.output_context);
   if (rc != DDS_RETCODE_OK) {
     ddsts_ostream_close(ostream);
     ddsrt_free((void*)h_file_name);
@@ -1641,6 +1700,27 @@ alignment_t *max_alignment(alignment_t *a, alignment_t *b)
    return a->ordering > b->ordering ? a : b;
 }
 
+static alignment_t *ddsts_basic_type_alignment(ddsts_flags_t type)
+{
+  switch (type) {
+    case DDSTS_CHAR:       return ALIGNMENT_ONE; break;
+    case DDSTS_OCTET:      return ALIGNMENT_ONE; break;
+    case DDSTS_INT8:       return ALIGNMENT_ONE; break;
+    case DDSTS_UINT8:      return ALIGNMENT_ONE; break;
+    case DDSTS_BOOLEAN:    return ALIGNMENT_BOOL; break;
+    case DDSTS_SHORT:      return ALIGNMENT_TWO; break;
+    case DDSTS_USHORT:     return ALIGNMENT_TWO; break;
+    case DDSTS_LONG:       return ALIGNMENT_FOUR; break;
+    case DDSTS_ULONG:      return ALIGNMENT_FOUR; break;
+    case DDSTS_FLOAT:      return ALIGNMENT_FOUR; break;
+    case DDSTS_LONGLONG:   return ALIGNMENT_EIGHT; break;
+    case DDSTS_ULONGLONG:  return ALIGNMENT_EIGHT; break;
+    case DDSTS_DOUBLE:     return ALIGNMENT_EIGHT; break;
+    default:
+      assert(0);
+  }
+}
+
 static alignment_t *ddsts_type_alignment(ddsts_type_t *type)
 {
   switch (DDSTS_TYPE_OF(type)) {
@@ -1680,6 +1760,14 @@ static alignment_t *ddsts_type_alignment(ddsts_type_t *type)
         return ddsts_type_alignment(type->forward.definition);
       }
       break;
+    case DDSTS_UNION: {
+      alignment_t *alignment = ddsts_basic_type_alignment(type->union_def.switch_type);
+      for (ddsts_type_t *cases = type->union_def.cases.first; cases != NULL; cases = cases->type.next) {
+        alignment = max_alignment(alignment, ddsts_type_alignment(cases->declaration.decl_type));
+      }
+      return alignment;
+      break;
+    }
     case DDSTS_WIDE_CHAR:
     case DDSTS_LONGDOUBLE:
     case DDSTS_FIXED_PT_CONST:
